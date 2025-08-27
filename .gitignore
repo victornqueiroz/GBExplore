@@ -1,1 +1,16 @@
+# Godot caches/artifacts
+.import/
+.godot/
+
+# C#/Mono (if used)
+.mono/
+
+# Editors / OS
 .DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Logs & temp
+*.log
+*.tmp
