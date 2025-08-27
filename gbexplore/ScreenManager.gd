@@ -359,8 +359,9 @@ func _close_choice_panel() -> void:
 		player.set_input_enabled(true)
 
 func _unhandled_input(event: InputEvent) -> void:
-	# If the choice panel is open, only handle its navigation.
+	# If the choice panel is open, only handle its navigation + confirm.
 	if choice_panel.visible:
+		# Move selection (up/left)
 		if event.is_action_pressed("ui_up") or event.is_action_pressed("ui_left"):
 			var i := _menu_index - 1
 			while i >= 0:
@@ -372,6 +373,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			return
 
+		# Move selection (down/right)
 		elif event.is_action_pressed("ui_down") or event.is_action_pressed("ui_right"):
 			var i2 := _menu_index + 1
 			while i2 < option_buttons.size():
@@ -383,6 +385,16 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			return
 
+		# CONFIRM (works for keyboard Enter/Return *and* your virtual Interact)
+		elif event.is_action_pressed("ui_accept") or event.is_action_pressed("interact"):
+			if _menu_index >= 0 and _menu_index < option_buttons.size() and option_buttons[_menu_index].visible:
+				_on_option_pressed(_menu_index)  # directly trigger the same handler
+				get_viewport().set_input_as_handled()
+			return
+
+		# Consume other inputs while the panel is open so they don't leak to gameplay
+		if event is InputEventKey or event is InputEventAction or event is InputEventJoypadButton:
+			get_viewport().set_input_as_handled()
 		return
 
 	# If a dialogue is visible, let the DialogueBox consume input.
