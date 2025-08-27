@@ -1,0 +1,33 @@
+[gd_scene load_steps=6 format=3 uid="uid://di3gxsmbux1c2"]
+
+[ext_resource type="Script" uid="uid://l0ekmwbfts3r" path="res://actors/chest.gd" id="1_cos08"]
+[ext_resource type="Texture2D" uid="uid://da3ngfuna7tbk" path="res://actors/ChestClosed.png" id="1_cwcoc"]
+[ext_resource type="Texture2D" uid="uid://cd2q6e3mjqd6y" path="res://actors/ChestOpen.png" id="2_cos08"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_cwcoc"]
+size = Vector2(16, 16)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_cos08"]
+size = Vector2(16, 16)
+
+[node name="Chest" type="Node2D"]
+script = ExtResource("1_cos08")
+
+[node name="ClosedSprite" type="Sprite2D" parent="."]
+texture = ExtResource("1_cwcoc")
+
+[node name="OpenSprite" type="Sprite2D" parent="."]
+visible = false
+texture = ExtResource("2_cos08")
+
+[node name="Area2D" type="Area2D" parent="."]
+collision_layer = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D"]
+shape = SubResource("RectangleShape2D_cwcoc")
+
+[node name="Blocker" type="StaticBody2D" parent="."]
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Blocker"]
+shape = SubResource("RectangleShape2D_cos08")

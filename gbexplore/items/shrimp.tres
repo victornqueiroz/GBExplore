@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="ItemData" load_steps=3 format=3 uid="uid://b1nrhfbmn6du1"]
+
+[ext_resource type="Texture2D" uid="uid://yr6dsfn632in" path="res://items/shrimp.png" id="1_2t6x1"]
+[ext_resource type="Script" uid="uid://bid2jph5r7dp8" path="res://items/ItemData.gd" id="1_gm0ld"]
+
+[resource]
+script = ExtResource("1_gm0ld")
+id = "shrimp"
+display_name = "Shrimp"
+icon = ExtResource("1_2t6x1")
+description = "A shrimp."
+stackable = false
+metadata/_custom_type_script = "uid://bid2jph5r7dp8"
