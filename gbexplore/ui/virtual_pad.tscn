@@ -1,0 +1,25 @@
+[gd_scene load_steps=2 format=3 uid="uid://dpk32ncxcdoxg"]
+
+[ext_resource type="Script" path="res://ui/VirtualPad.gd" id="1_d6kw5"]
+
+[node name="VirtualPad" type="CanvasLayer"]
+layer = 99
+script = ExtResource("1_d6kw5")
+
+[node name="InteractBtn" type="TouchScreenButton" parent="."]
+action = "interact"
+
+[node name="MapBtn" type="TouchScreenButton" parent="."]
+action = "show_map"
+
+[node name="UpBtn" type="TouchScreenButton" parent="."]
+action = "show_map"
+
+[node name="DownBtn" type="TouchScreenButton" parent="."]
+action = "show_map"
+
+[node name="LeftBtn" type="TouchScreenButton" parent="."]
+action = "show_map"
+
+[node name="RightBtn" type="TouchScreenButton" parent="."]
+action = "show_map"
