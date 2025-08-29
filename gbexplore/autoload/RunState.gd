@@ -166,6 +166,16 @@ var ROOM_DEFS := [
 		"unique": true
 	},
 	{
+		"path": "res://rooms/room_witch.tscn",
+		"name": "Witch",
+		"type": "house",
+		"tags": ["land","npc"],
+		"exits":      {"N": false, "E": false, "S": true, "W": false},
+		"entry_open": {"N": false, "E": false, "S": true, "W": false},
+		"weight": 2, 
+		"unique": true
+	},
+	{
 		"path": "res://rooms/room_rocky.tscn",
 		"name": "Rocky",
 		"type": "mountain",

@@ -13,10 +13,10 @@ func _get_itemdb() -> Node:
 	# Cache the ItemDB autoload instance (named "ItemDB" in Autoload)
 	if _itemdb and is_instance_valid(_itemdb):
 		return _itemdb
-	if has_node("/root/ItemDB"):
-		_itemdb = get_node("/root/ItemDB")
+	if has_node("/root/ItemDb"):
+		_itemdb = get_node("/root/ItemDb")
 		return _itemdb
-	push_error("Autoload 'ItemDB' not found at /root/ItemDB. Set its Node Name to 'ItemDB' in Project Settings → Autoload.")
+	push_error("Autoload 'ItemDb' not found at /root/ItemDb. Set its Node Name to 'ItemDb' in Project Settings → Autoload.")
 	return null
 
 func add(id: String, amount: int = 1) -> void:
