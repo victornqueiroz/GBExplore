@@ -7,8 +7,8 @@ const MAP_H := 9
 const SCREEN_SIZE := Vector2i(MAP_W * TILE, MAP_H * TILE)
 const EXIT_BAND := 4
 
-const NPC_SCENE := preload("res://NPC.tscn")	# adjust path if needed
-const CHEST_SCENE := preload("res://actors/Chest.tscn")   # adjust path if needed
+const NPC_SCENE := preload("res://NPC.tscn")
+const CHEST_SCENE := preload("res://actors/Chest.tscn")
 
 # --- Edge rocks (visual + collider) ---
 const ROCK_TEX := preload("res://art/boulder.png")
@@ -35,6 +35,15 @@ const WALL_OVERHANG := 1.0
 const WALL_LAYER := 1
 const WALL_MASK := 1
 
+signal map_state_changed
+var _game_over_running: bool = false
+
+# Game Over FX
+const GAME_OVER_SHAKE_DUR: float = 1.8
+const GAME_OVER_SHAKE_MAG: float = 8.0
+const GAME_OVER_FADE_OUT: float = 3.0
+const GAME_OVER_FADE_IN: float = 0.9
+
 # ----- Nodes -----
 @onready var screen_root: Node2D = $ScreenRoot
 @onready var player: CharacterBody2D = $Player
@@ -45,7 +54,8 @@ const WALL_MASK := 1
 	$UI/ChoicePanel/MarginContainer/VBoxContainer/Option2,
 	$UI/ChoicePanel/MarginContainer/VBoxContainer/Option3
 ]
-@onready var fade_layer: CanvasLayer = $FadeLayer
+@onready var fade_layer: CanvasLayer = $UI/FadeLayer
+@onready var fade_black: ColorRect = $UI/ColorRect
 @onready var map_overlay: Control = $MapOverlay/MapRoot
 @onready var dialog_box: Control = $UI/DialogueBox
 
@@ -66,6 +76,9 @@ func _ready() -> void:
 	ROCK_MASK = GameConfig.WALL_MASK
 	print("Has /root/ItemDb? ", has_node("/root/ItemDb"))
 
+	# make sure the fade overlay starts fully transparent
+	_fade_reset_to_clear()
+
 	_load_room_at(RunState.pos, "res://rooms/room_start.tscn")
 	player.position = Vector2(SCREEN_SIZE.x / 2.0, SCREEN_SIZE.y / 2.0)
 	_update_hud()
@@ -78,7 +91,7 @@ func _physics_process(_delta: float) -> void:
 	if choice_panel.visible:
 		return
 	if is_transitioning:
-		return	# only skip edge detection; do not block player movement
+		return
 	_check_edges()
 
 func _check_edges() -> void:
@@ -95,10 +108,6 @@ func _check_edges() -> void:
 		_propose_transition(Vector2i(0, 1)); return
 
 # Map move direction -> entry side of the NEW room
-# (-1,0) -> entering from RIGHT ("E")
-# ( 1,0) -> entering from LEFT  ("W")
-# (0,-1) -> entering from BOTTOM("S")
-# (0, 1) -> entering from TOP   ("N")
 func _entry_side_for_dir(dir: Vector2i) -> String:
 	if dir == Vector2i(-1, 0):
 		return "E"
@@ -121,7 +130,7 @@ func _propose_transition(dir: Vector2i) -> void:
 	pending_dir = dir
 	var next := RunState.pos + dir
 
-	# hard-cap to 8x8 → if out-of-bounds, just bonk/do nothing
+	# hard-cap to 8x8 → if out-of-bounds, just bonk
 	if not _in_world_bounds(next):
 		_show_no_exit_feedback(_dir_to_string(dir))
 		return
@@ -136,12 +145,13 @@ func _propose_transition(dir: Vector2i) -> void:
 
 		if side_is_open:
 			_perform_transition(next, path_existing)
+
 		else:
 			_refresh_edge_blockers_for_current_room()
 			_refresh_edge_rocks_for_current_room()
 		return
 
-	# New destination: get base candidates (do NOT filter by neighbor topology)
+	# New destination: pick candidates
 	var entry_side := _entry_side_for_dir(dir)
 	var base_candidates: Array = RunState.pick_room_candidates(entry_side, 3)
 
@@ -156,6 +166,7 @@ func _propose_transition(dir: Vector2i) -> void:
 			var def: Dictionary = candidate_defs[i]
 			var nice: String = ""
 			if def.has("name"):
+
 				nice = String(def["name"])
 			else:
 				var pth: String = String(def.get("path", ""))
@@ -166,7 +177,7 @@ func _propose_transition(dir: Vector2i) -> void:
 		else:
 			option_buttons[i].visible = false
 
-	# If nothing to show, treat like wall (rare)
+	# If nothing to show, treat like wall
 	if candidate_defs.size() == 0:
 		_refresh_edge_blockers_for_current_room()
 		_refresh_edge_rocks_for_current_room()
@@ -175,8 +186,8 @@ func _propose_transition(dir: Vector2i) -> void:
 	_open_choice_panel()
 
 # Southmost row → only "beach"; Leftmost col → only "path"
-# Tries tags first, then name/path substring. Falls back to base list if filter empties it.
 func _edge_constrained_candidates(base: Array, nx:int, ny:int) -> Array:
+
 	var want_kind := ""
 	if ny == GRID_H - 1:
 		want_kind = "beach"
@@ -197,6 +208,7 @@ func _edge_constrained_candidates(base: Array, nx:int, ny:int) -> Array:
 			elif def.has("type") and String(def["type"]).to_lower() == want_kind:
 				filtered.append(def)
 			else:
+
 				var name_s := String(def.get("name", "")).to_lower()
 				var path_s := String(def.get("path", "")).to_lower()
 				if name_s.findn(want_kind) != -1 or path_s.findn(want_kind) != -1:
@@ -217,6 +229,9 @@ func _on_option_pressed(index: int) -> void:
 	if "mark_used_if_unique" in RunState:
 		RunState.mark_used_if_unique(def)
 
+
+	emit_signal("map_state_changed")
+
 	# Can we enter from this side NOW?
 	var entry_side := _entry_side_for_dir(pending_dir)
 	var can_enter_now := true
@@ -235,6 +250,7 @@ func _on_option_pressed(index: int) -> void:
 # -------------------------------
 func _perform_transition(next_coord: Vector2i, path: String) -> void:
 	if not is_instance_valid(fade_layer):
+
 		_do_room_swap(next_coord, path)
 		return
 
@@ -256,14 +272,15 @@ func _do_room_swap(next_coord: Vector2i, path: String) -> void:
 	var mid_row := (MAP_H - 1) / 2
 	var spawn := Vector2(SCREEN_SIZE.x / 2.0, SCREEN_SIZE.y / 2.0)
 
+
 	if pending_dir == Vector2i(-1, 0):
-		spawn = Vector2((MAP_W - 1 + 0.5) * TILE, (mid_row + 0.5) * TILE)   # appear RIGHT edge
+		spawn = Vector2((MAP_W - 1 + 0.5) * TILE, (mid_row + 0.5) * TILE)
 	elif pending_dir == Vector2i(1, 0):
-		spawn = Vector2((0 + 0.5) * TILE, (mid_row + 0.5) * TILE)           # appear LEFT edge
+		spawn = Vector2((0 + 0.5) * TILE, (mid_row + 0.5) * TILE)
 	elif pending_dir == Vector2i(0, -1):
-		spawn = Vector2((mid_col + 0.5) * TILE, (MAP_H - 1 + 0.5) * TILE)   # appear BOTTOM edge
+		spawn = Vector2((mid_col + 0.5) * TILE, (MAP_H - 1 + 0.5) * TILE)
 	elif pending_dir == Vector2i(0, 1):
-		spawn = Vector2((mid_col + 0.5) * TILE, (0 + 0.5) * TILE)           # appear TOP edge
+		spawn = Vector2((mid_col + 0.5) * TILE, (0 + 0.5) * TILE)
 
 	# Load and add the new room
 	var ps := load(path)
@@ -275,21 +292,18 @@ func _do_room_swap(next_coord: Vector2i, path: String) -> void:
 	screen_root.add_child(room)
 
 	# Visual blockers / decorations
+
 	_apply_edge_rocks(room, path, next_coord)
 	if USE_EDGE_BLOCKERS:
 		_apply_edge_blockers(room, path, next_coord)
 
-	# --- NPCs ---
+	# --- NPCs & chests ---
 	_spawn_npcs(room, path)
 	_spawn_chests(room, path)
-	
+
 	# Update run state + spawn player
 	RunState.pos = next_coord
 	player.position = spawn
-
-	# Optional: if you might spawn on top of an NPC, nudge out
-	# if room.has_node("__NPCs"):
-	# 	_nudge_player_if_overlapping_npc(room)
 
 	# Close choice UI if still open
 	if choice_panel.visible:
@@ -316,11 +330,55 @@ func _clear_room() -> void:
 		c.queue_free()
 
 func _game_over() -> void:
-	RunState.new_run()
-	_clear_room()
-	_load_room_at(RunState.pos, "res://rooms/room_start.tscn")
-	player.position = Vector2(SCREEN_SIZE.x / 2.0, SCREEN_SIZE.y / 2.0)
-	_update_hud()
+	if _game_over_running:
+		return
+	_game_over_running = true
+
+
+	# Allow movement, but stop room transitions during the sequence
+	is_transitioning = true
+
+	# Start quake in parallel (do NOT await)
+	_shake_world(GAME_OVER_SHAKE_DUR, GAME_OVER_SHAKE_MAG)
+
+	# Ensure the fade starts from fully clear (not pre-dark)
+	_fade_reset_to_clear()
+
+	# Long game-over fade; player can keep moving during fade-out
+	if is_instance_valid(fade_layer):
+		fade_layer.fade_through_black(
+			GAME_OVER_FADE_OUT,	# ~3s fade to black from alpha 0
+			GAME_OVER_FADE_IN,	# quick fade-in after reset
+			func() -> void:
+				# We are fully black now → freeze, reset, then re-enable for fade-in
+				if "set_input_enabled" in player:
+					player.set_input_enabled(false)
+
+				RunState.new_run()
+				_clear_room()
+				_load_room_at(RunState.pos, "res://rooms/room_start.tscn")
+				player.position = Vector2(SCREEN_SIZE.x / 2.0, SCREEN_SIZE.y / 2.0)
+				_update_hud()
+				emit_signal("map_state_changed")
+
+				is_transitioning = false
+
+				if "set_input_enabled" in player:
+					player.set_input_enabled(true)
+
+				_game_over_running = false
+		)
+	else:
+		# Fallback if no FadeLayer
+		RunState.new_run()
+		_clear_room()
+		_load_room_at(RunState.pos, "res://rooms/room_start.tscn")
+		player.position = Vector2(SCREEN_SIZE.x / 2.0, SCREEN_SIZE.y / 2.0)
+
+		_update_hud()
+		emit_signal("map_state_changed")
+		is_transitioning = false
+		_game_over_running = false
 
 func _load_room_at(coord: Vector2i, path: String) -> void:
 	var ps := load(path)
@@ -331,10 +389,13 @@ func _load_room_at(coord: Vector2i, path: String) -> void:
 	screen_root.add_child(room)
 	RunState.visited[coord] = path
 
+	emit_signal("map_state_changed")
+
 	# rocks for initial room
 	_apply_edge_rocks(room, path, coord)
 
 	# respect the flag
+
 	if USE_EDGE_BLOCKERS:
 		_apply_edge_blockers(room, path, coord)
 
@@ -355,10 +416,15 @@ func _open_choice_panel() -> void:
 
 func _close_choice_panel() -> void:
 	choice_panel.visible = false
+
 	if "set_input_enabled" in player:
 		player.set_input_enabled(true)
 
 func _unhandled_input(event: InputEvent) -> void:
+	# ignore menus while game-over FX are running
+	if _game_over_running:
+		return
+
 	# If the choice panel is open, only handle its navigation.
 	if choice_panel.visible:
 		if event.is_action_pressed("ui_up") or event.is_action_pressed("ui_left"):
@@ -382,7 +448,6 @@ func _unhandled_input(event: InputEvent) -> void:
 			option_buttons[_menu_index].grab_focus()
 			get_viewport().set_input_as_handled()
 			return
-
 		return
 
 	# If a dialogue is visible, let the DialogueBox consume input.
@@ -393,6 +458,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if map_overlay and map_overlay.visible:
 		return
 
+
 	# Interact with nearest NPC.
 	if event.is_action_pressed("interact") or event.is_action_pressed("ui_accept"):
 		var npc := _nearest_npc()
@@ -402,12 +468,17 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 
 func _input(event: InputEvent) -> void:
+	# ignore extra input toggles while game-over FX are running
+	if _game_over_running:
+		return
+
 	if event.is_action_pressed("show_map"):
 		if map_overlay != null:
 			map_overlay.toggle()
 			if "set_input_enabled" in player:
 				player.set_input_enabled(not map_overlay.visible)
 			get_viewport().set_input_as_handled()
+
 
 # Simple feedback when trying to walk outside the 8x8 world
 func _show_no_exit_feedback(dir:String) -> void:
@@ -430,6 +501,7 @@ func _apply_edge_rocks(room: Node2D, room_path: String, coord: Vector2i) -> void
 	root.name = "__EdgeRocks"
 	room.add_child(root)
 
+
 	var blocked := {
 		"N": _is_side_blocked_by_neighbor_or_edge(coord, "N"),
 		"E": _is_side_blocked_by_neighbor_or_edge(coord, "E"),
@@ -449,6 +521,7 @@ func _apply_edge_rocks(room: Node2D, room_path: String, coord: Vector2i) -> void
 
 	if blocked["N"]:
 		for col in range(MAP_W):
+
 			var p := _edge_pos_for_cell("N", col, 0)
 			_spawn_rock(root, p)
 
@@ -469,6 +542,7 @@ func _is_side_blocked_by_neighbor_or_edge(coord: Vector2i, side: String) -> bool
 		return false
 
 	var this_path := String(RunState.visited.get(coord, ""))
+
 	var neigh_path := String(RunState.visited.get(n, ""))
 	var this_open := RunState.entry_open_for_path(this_path, side)
 	var opp := _opp_side(side)
@@ -489,6 +563,7 @@ func _opp_side(side: String) -> String:
 	if side == "S": return "N"
 	if side == "E": return "W"
 	if side == "W": return "E"
+
 	return side
 
 # Position a rock along the edge centered on a tile's middle
@@ -509,6 +584,7 @@ func _spawn_rock(parent: Node, pos: Vector2) -> void:
 	var spr := Sprite2D.new()
 	spr.texture = ROCK_TEX
 	spr.position = pos
+
 	spr.z_index = ROCK_Z
 	spr.scale = ROCK_SCALE
 	parent.add_child(spr)
@@ -529,6 +605,7 @@ func _spawn_rock(parent: Node, pos: Vector2) -> void:
 # EDGE BLOCKERS (optional)
 # -------------------------------
 func _apply_edge_blockers(room: Node, room_path: String, coord: Vector2i = RunState.pos) -> void:
+
 	var open_N := true
 	var open_E := true
 	var open_S := true
@@ -549,6 +626,7 @@ func _apply_edge_blockers(room: Node, room_path: String, coord: Vector2i = RunSt
 			open_N = false
 		var ecoord := coord + Vector2i(1, 0)
 		if RunState.visited.has(ecoord) and not RunState.entry_open_for_path(String(RunState.visited[ecoord]), "W"):
+
 			open_E = false
 		var scoord := coord + Vector2i(0, 1)
 		if RunState.visited.has(scoord) and not RunState.entry_open_for_path(String(RunState.visited[scoord]), "N"):
@@ -569,6 +647,7 @@ func _apply_edge_blockers(room: Node, room_path: String, coord: Vector2i = RunSt
 	var over  := GameConfig.EDGE_OVERHANG
 	var zed   := GameConfig.EDGE_Z
 	var lay   := GameConfig.WALL_LAYER
+
 	var mask  := GameConfig.WALL_MASK
 
 	if not open_W:
@@ -589,6 +668,7 @@ func _add_wall(parent: Node, rect: Rect2, label: String, layer: int, mask: int, 
 	body.name = label
 	body.collision_layer = layer
 	body.collision_mask = mask
+
 	body.z_index = zed
 
 	var shape := CollisionShape2D.new()
@@ -629,6 +709,7 @@ func _refresh_edge_blockers_for_current_room() -> void:
 
 # Rebuild ROCKS for the CURRENT room using up-to-date neighbor info
 func _refresh_edge_rocks_for_current_room() -> void:
+
 	var room := _get_current_room()
 	if room == null:
 		return
@@ -649,6 +730,7 @@ func _def_open_map(def: Dictionary) -> Dictionary:
 		return def["entry_open"]
 	if def.has("exits"):
 		return def["exits"]
+
 	return {"N": true, "E": true, "S": true, "W": true}
 
 func _def_exit_sides(def: Dictionary) -> Array[String]:
@@ -724,7 +806,6 @@ func _spawn_npcs(room: Node2D, room_path: String) -> void:
 			continue
 		var d: Dictionary = item as Dictionary
 		var npc := NPC_SCENE.instantiate()
-		# Use set() to avoid static-typing issues if NPC.gd has no class_name.
 		if d.has("sprite"):
 			npc.set("sprite_path", String(d["sprite"]))
 		if d.has("tile"):
@@ -765,7 +846,7 @@ func _start_dialog(npc: Node) -> void:
 		elif tmp is String:
 			lines = PackedStringArray([tmp])
 	else:
-		var raw: Variant = npc.get("dialog_lines")  # <- typed, no warning
+		var raw: Variant = npc.get("dialog_lines")
 		if raw is PackedStringArray:
 			lines = raw
 		elif raw is Array:
@@ -788,7 +869,6 @@ func _on_dialog_finished() -> void:
 
 func _spawn_chests(room: Node2D, room_path: String) -> void:
 	var def: Dictionary = RunState.get_def_by_path(room_path)
-	
 	if def.size() == 0 or not def.has("chests"):
 		return
 	var arr: Array = def["chests"] as Array
@@ -814,3 +894,44 @@ func _spawn_chests(room: Node2D, room_path: String) -> void:
 			var t: Vector2i = d["tile"]
 			chest.position = Vector2((t.x + 0.5) * TILE, (t.y + 0.5) * TILE)
 		root.add_child(chest)
+
+# --- Map query helpers (used by MapRoot) ---
+func map_is_side_open_here(coord: Vector2i, side: String) -> bool:
+	var path := String(RunState.visited.get(coord, ""))
+	if path == "":
+		return false
+	if "entry_open_for_path" in RunState:
+		return RunState.entry_open_for_path(path, side)
+	return true
+
+func map_is_exit_open_between(coord: Vector2i, side: String) -> bool:
+	var d := _side_to_vec_world(side)
+	var n := coord + d
+	if not _in_world_bounds(n):
+		return false
+	if not RunState.visited.has(n):
+		return false
+	return not _is_side_blocked_by_neighbor_or_edge(coord, side)
+
+# -------------------------------
+# FX helpers
+# -------------------------------
+func _shake_world(duration: float = 0.6, magnitude: float = 6.0) -> void:
+	var t := 0.0
+	var orig := screen_root.position
+	while t < duration:
+		var decay := 1.0 - (t / duration)	# ease out
+		var off := Vector2(
+			randf_range(-1.0, 1.0),
+			randf_range(-1.0, 1.0)
+		) * magnitude * decay
+		screen_root.position = orig + off
+		await get_tree().process_frame
+		t += get_process_delta_time()
+	# restore
+	screen_root.position = orig
+
+func _fade_reset_to_clear() -> void:
+	if is_instance_valid(fade_black):
+		var c := fade_black.color
+		fade_black.color = Color(c.r, c.g, c.b, 0.0)	# start fully transparent

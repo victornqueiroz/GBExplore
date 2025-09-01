@@ -1,10 +1,10 @@
-[gd_scene load_steps=6 format=3 uid="uid://beuvrvjsye6wy"]
+[gd_scene load_steps=5 format=3 uid="uid://72y86uekl2ai"]
 
-[ext_resource type="Texture2D" uid="uid://bkfum4x7cxbhv" path="res://art/tileset.png" id="1_cecmk"]
-[ext_resource type="Texture2D" uid="uid://bnvt1ann8woda" path="res://art/water-tileset.png" id="2_2xii0"]
+[ext_resource type="Texture2D" uid="uid://bkfum4x7cxbhv" path="res://art/tileset.png" id="1_r1cav"]
+[ext_resource type="PackedScene" uid="uid://dcxrs4euggtoy" path="res://NPC.tscn" id="2_dd7uo"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_7qlfm"]
-texture = ExtResource("1_cecmk")
+texture = ExtResource("1_r1cav")
 0:0/0 = 0
 0:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(-8, -8, 8, -8, 8, 8, -8, 8)
 1:0/0 = 0
@@ -149,29 +149,9 @@ texture = ExtResource("1_cecmk")
 4:10/0/physics_layer_0/polygon_0/points = PackedVector2Array(-8, -8, 8, -8, 8, 8, -8, 8)
 5:10/0 = 0
 
-[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_fhjk8"]
-texture = ExtResource("2_2xii0")
-0:3/animation_columns = 4
-0:3/animation_speed = 4.0
-0:3/animation_frame_0/duration = 1.0
-0:3/animation_frame_1/duration = 1.0
-0:3/animation_frame_2/duration = 1.0
-0:3/animation_frame_3/duration = 1.0
-0:3/0 = 0
-0:3/0/physics_layer_0/polygon_0/points = PackedVector2Array(-8, -8, 8, -8, 8, 8, -8, 8)
-0:2/animation_columns = 4
-0:2/animation_speed = 4.0
-0:2/animation_frame_0/duration = 1.0
-0:2/animation_frame_1/duration = 1.0
-0:2/animation_frame_2/duration = 1.0
-0:2/animation_frame_3/duration = 1.0
-0:2/0 = 0
-0:2/0/physics_layer_0/polygon_0/points = PackedVector2Array(-8, -8, 8, -8, 8, 8, -8, 8)
-
 [sub_resource type="TileSet" id="TileSet_nl460"]
 physics_layer_0/collision_layer = 1
 sources/0 = SubResource("TileSetAtlasSource_7qlfm")
-sources/2 = SubResource("TileSetAtlasSource_fhjk8")
 
 [node name="RoomStart" type="Node2D"]
 
@@ -190,4 +170,9 @@ text = "Start"
 [node name="TileMap" type="TileMap" parent="."]
 tile_set = SubResource("TileSet_nl460")
 format = 2
-layer_0/tile_data = PackedInt32Array(0, 131072, 0, 1, 131072, 0, 2, 131072, 0, 3, 131072, 0, 4, 327680, 10, 5, 131072, 0, 65541, 196608, 0, 65542, 196608, 0, 65543, 196608, 0, 65544, 196608, 0, 8, 131072, 0, 7, 131072, 0, 6, 131072, 0, 65538, 196608, 0, 65537, 196608, 0, 65536, 196608, 0, 65539, 196608, 0, 65540, 327680, 10, 131072, 196608, 0, 196608, 393216, 8, 262144, 393216, 8, 327680, 393216, 8, 393216, 2, 2, 458752, 2, 3, 131073, 196608, 0, 196609, 393216, 8, 262145, 393216, 8, 327681, 393216, 8, 393217, 2, 2, 458753, 2, 3, 131074, 196608, 0, 196610, 393216, 8, 262146, 393216, 8, 327682, 393216, 8, 393218, 2, 2, 458754, 2, 3, 131075, 196608, 0, 196611, 393216, 8, 262147, 393216, 8, 327683, 393216, 8, 393219, 2, 2, 458755, 2, 3, 131076, 327680, 10, 196612, 393216, 8, 262148, 393216, 8, 327684, 393216, 8, 393220, 2, 2, 458756, 2, 3, 131077, 196608, 0, 196613, 393216, 8, 262149, 393216, 8, 327685, 393216, 8, 393221, 2, 2, 458757, 2, 3, 131078, 196608, 0, 196614, 393216, 8, 262150, 393216, 8, 327686, 393216, 8, 393222, 2, 2, 458758, 2, 3, 131079, 196608, 0, 196615, 393216, 8, 262151, 393216, 8, 327687, 393216, 8, 393223, 2, 2, 458759, 2, 3, 131080, 196608, 0, 196616, 393216, 8, 262152, 393216, 8, 327688, 393216, 8, 393224, 2, 2, 458760, 2, 3, 524288, 2, 3, 524289, 2, 3, 524290, 2, 3, 524291, 2, 3, 524292, 2, 3, 524293, 2, 3, 524294, 2, 3, 524295, 2, 3, 524296, 2, 3)
+layer_0/tile_data = PackedInt32Array(0, 131072, 0, 1, 131072, 0, 2, 131072, 0, 3, 131072, 0, 4, 327680, 10, 5, 131072, 0, 65541, 196608, 0, 65542, 196608, 0, 65543, 196608, 0, 65544, 196608, 0, 8, 131072, 0, 7, 131072, 0, 6, 131072, 0, 65538, 196608, 0, 65537, 196608, 0, 65536, 196608, 0, 65539, 196608, 0, 65540, 327680, 10, 131072, 196608, 0, 196608, 393216, 8, 262144, 393216, 8, 327680, 393216, 8, 393216, 458752, 8, 458752, 0, 9, 131073, 196608, 0, 196609, 65536, 9, 262145, 393216, 8, 327681, 393216, 8, 393217, 458752, 8, 458753, 0, 9, 131074, 196608, 0, 196610, 393216, 8, 262146, 393216, 8, 327682, 393216, 8, 393218, 458752, 8, 458754, 0, 9, 131075, 196608, 0, 196611, 393216, 8, 262147, 393216, 8, 327683, 393216, 8, 393219, 458752, 8, 458755, 0, 9, 131076, 327680, 10, 196612, 393216, 8, 262148, 393216, 8, 327684, 393216, 8, 393220, 458752, 8, 458756, 0, 9, 131077, 196608, 0, 196613, 393216, 8, 262149, 393216, 8, 327685, 393216, 8, 393221, 458752, 8, 458757, 0, 9, 131078, 196608, 0, 196614, 393216, 8, 262150, 393216, 8, 327686, 393216, 8, 393222, 458752, 8, 458758, 0, 9, 131079, 196608, 0, 196615, 262144, 0, 262151, 393216, 0, 327687, 458752, 5, 393223, 458752, 8, 458759, 0, 9, 131080, 196608, 0, 196616, 327680, 0, 262152, 458752, 0, 327688, 393216, 8, 393224, 458752, 8, 458760, 0, 9, 524288, 0, 9, 524289, 0, 9, 524290, 0, 9, 524291, 0, 9, 524292, 0, 9, 524293, 0, 9, 524294, 0, 9, 524295, 0, 9, 524296, 0, 9)
+
+[node name="NPC" parent="." instance=ExtResource("2_dd7uo")]
+sprite_path = "res://npc/mermaid.png"
+tile = Vector2i(5, 5)
+dialog_lines = ["嗨，陌生人！", "我要返屋企，但我唔識游水。", "如果我有一條魔鬼魚，我就可以騎住佢⋯"]

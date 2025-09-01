@@ -1,31 +1,36 @@
 # FadeLayer.gd
 extends CanvasLayer
-@onready var rect := $ColorRect
 
-func _ready():
+@onready var rect: ColorRect = $ColorRect
+
+func _ready() -> void:
+	# Make sure the base color is opaque black; we'll animate visibility via self_modulate.
+	var c := rect.color
+	rect.color = Color(c.r, c.g, c.b, 1.0)
+	# Start fully transparent
+	rect.self_modulate.a = 0.0
 	rect.visible = true
-	rect.modulate.a = 0.0  # start transparent
+	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-func fade_out(duration := 0.25):
-	print("FADE OUT")
-	var t := create_tween()
-	t.tween_property(rect, "modulate:a", 1.0, duration)
+func fade_out(duration: float = 0.25) -> void:
+	var t := create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	t.tween_property(rect, "self_modulate:a", 1.0, duration)
 	await t.finished
 
-func fade_in(duration := 0.25):
-	print("FADE IN")
-	var t := create_tween()
-	t.tween_property(rect, "modulate:a", 0.0, duration)
-	#await t.finished
+func fade_in(duration: float = 0.25) -> void:
+	var t := create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	t.tween_property(rect, "self_modulate:a", 0.0, duration)
+	await t.finished
 
-func fade_to(alpha: float, duration := 0.25) -> void:
-	var t := create_tween()
-	t.tween_property($ColorRect, "modulate:a", alpha, duration)
-	# no await -> non-blocking
+func fade_to(alpha: float, duration: float = 0.25) -> void:
+	var t := create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	t.tween_property(rect, "self_modulate:a", alpha, duration)
 
-# tabs used below
+# Out → callback while black → in
 func fade_through_black(out_d: float, in_d: float, mid_cb: Callable) -> void:
-	var t := create_tween()
-	t.tween_property($ColorRect, "modulate:a", 1.0, out_d)
+	# Always start from fully clear so long fades look correct
+	rect.self_modulate.a = 0.0
+	var t := create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	t.tween_property(rect, "self_modulate:a", 1.0, out_d)
 	t.tween_callback(mid_cb)
-	t.tween_property($ColorRect, "modulate:a", 0.0, in_d)
+	t.tween_property(rect, "self_modulate:a", 0.0, in_d)

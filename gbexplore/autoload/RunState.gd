@@ -1,7 +1,7 @@
 extends Node
 # Autoloaded as "RunState" (no class_name here)
 
-const START_STEPS := 250
+const START_STEPS := 3
 
 # Canonical world size (keep this in sync with ScreenManager or reference it from there)
 const GRID_W := 8
@@ -166,12 +166,42 @@ var ROOM_DEFS := [
 		"unique": true
 	},
 	{
-		"path": "res://rooms/room_witch.tscn",
+		"path": "res://rooms/room_witch3.tscn",
 		"name": "Witch",
 		"type": "house",
 		"tags": ["land","npc"],
 		"exits":      {"N": false, "E": false, "S": true, "W": false},
 		"entry_open": {"N": false, "E": false, "S": true, "W": false},
+		"weight": 2, 
+		"unique": true
+	},
+	{
+		"path": "res://rooms/room_farmer.tscn",
+		"name": "Farm",
+		"type": "land",
+		"tags": ["land","npc"],
+		"exits":      {"N": true, "E": false, "S": false, "W": true},
+		"entry_open": {"N": true, "E": false, "S": false, "W": true},
+		"weight": 2, 
+		"unique": true
+	},
+	{
+		"path": "res://rooms/room_farm2.tscn",
+		"name": "Plains",
+		"type": "land",
+		"tags": ["land"],
+		"exits":      {"N": true, "E": false, "S": false, "W": true},
+		"entry_open": {"N": true, "E": false, "S": false, "W": true},
+		"weight": 2, 
+		"unique": true
+	},
+	{
+		"path": "res://rooms/room_cave.tscn",
+		"name": "Cave",
+		"type": "cave",
+		"tags": ["land","chest"],
+		"exits":      {"N": false, "E": true, "S": false, "W": false},
+		"entry_open": {"N": false, "E": true, "S": false, "W": false},
 		"weight": 2, 
 		"unique": true
 	},
@@ -202,6 +232,16 @@ var ROOM_DEFS := [
 		"entry_open":   {"N": true, "E": true, "S": false, "W": true},
 		"weight": 3,
 		"unique": false
+	},
+	{
+		"path": "res://rooms/room_beach_special.tscn",
+		"name": "Beach ★",
+		"type": "beach",
+		"tags": ["water","beach"],
+		"exits":        {"N": true, "E": true, "S": false, "W": true},
+		"entry_open":   {"N": true, "E": true, "S": false, "W": true},
+		"weight": 3,
+		"unique": true
 	},
 	{
 		"path": "res://rooms/room_house.tscn",

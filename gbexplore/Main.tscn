@@ -112,6 +112,18 @@ offset_bottom = 1024.0
 texture = ExtResource("4_3dxm6")
 stretch_mode = 4
 
+[node name="FadeLayer" type="CanvasLayer" parent="UI"]
+script = ExtResource("4_fos0i")
+
+[node name="ColorRect" type="ColorRect" parent="UI/FadeLayer"]
+visibility_layer = 524288
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0, 0, 0, 1)
+
 [node name="MapOverlay" type="CanvasLayer" parent="."]
 script = SubResource("GDScript_r0du0")
 
@@ -121,15 +133,3 @@ anchors_preset = 0
 offset_right = 40.0
 offset_bottom = 40.0
 script = ExtResource("4_cm0pq")
-
-[node name="FadeLayer" type="CanvasLayer" parent="."]
-script = ExtResource("4_fos0i")
-
-[node name="ColorRect" type="ColorRect" parent="FadeLayer"]
-visibility_layer = 524288
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-color = Color(0, 0, 0, 1)
