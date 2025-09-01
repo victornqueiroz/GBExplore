@@ -1,7 +1,7 @@
 extends Node
 # Autoloaded as "RunState" (no class_name here)
 
-const START_STEPS := 3
+const START_STEPS := 30
 
 # Canonical world size (keep this in sync with ScreenManager or reference it from there)
 const GRID_W := 8
@@ -46,8 +46,19 @@ var ROOM_DEFS := [
 		"name": "Start",
 		"type": "land",
 		"tags": ["start"],
-		"exits":      {"N": true, "E": true, "S": true, "W": true},
-		"entry_open": {"N": true, "E": true, "S": true, "W": true},
+		"exits":      {"N": false, "E": true, "S": false, "W": true},
+		"entry_open": {"N": false, "E": true, "S": false, "W": true},
+		"weight": 4,
+		"unique": true,
+		"draftable": false
+	},
+	{
+		"path": "res://rooms/room_start2.tscn",
+		"name": "Start",
+		"type": "land",
+		"tags": ["start"],
+		"exits":      {"N": false, "E": true, "S": false, "W": true},
+		"entry_open": {"N": false, "E": true, "S": false, "W": true},
 		"weight": 4,
 		"unique": true,
 		"draftable": false
@@ -104,7 +115,7 @@ var ROOM_DEFS := [
 	},
 	{
 		"path": "res://rooms/room_path2.tscn",
-		"name": "Path2",
+		"name": "Path SE",
 		"type": "path",
 		"tags": ["land","path"],
 		"exits":      {"N": false, "E": true, "S": true, "W": false},
@@ -114,7 +125,7 @@ var ROOM_DEFS := [
 	},
 	{
 		"path": "res://rooms/room_path3.tscn",
-		"name": "Path3",
+		"name": "Path SW",
 		"type": "path",
 		"tags": ["land","path"],
 		"exits":      {"N": false, "E": false, "S": true, "W": true},
@@ -124,11 +135,21 @@ var ROOM_DEFS := [
 	},
 	{
 		"path": "res://rooms/room_path4.tscn",
-		"name": "Path4",
+		"name": "Path NW",
 		"type": "path",
 		"tags": ["land","path"],
 		"exits":      {"N": true, "E": false, "S": false, "W": true},
 		"entry_open": {"N": true, "E": false, "S": false, "W": true},
+		"weight": 3,
+		"unique": false
+	},
+	{
+		"path": "res://rooms/room_path5.tscn",
+		"name": "Path NE",
+		"type": "path",
+		"tags": ["land","path"],
+		"exits":      {"N": true, "E": true, "S": false, "W": false},
+		"entry_open": {"N": true, "E": true, "S": false, "W": false},
 		"weight": 3,
 		"unique": false
 	},
@@ -248,6 +269,17 @@ var ROOM_DEFS := [
 		"name": "House",
 		"type": "mountain",
 		"tags": ["mountain","house"],
+		"exits":        {"N": false, "E": false, "S": true, "W": false},
+		"entry_open":   {"N": false, "E": false, "S": true, "W": false},
+		"allowed_entry": ["S"],
+		"weight": 3,
+		"unique": true
+	},
+	{
+		"path": "res://rooms/room_mountain.tscn",
+		"name": "Mountain",
+		"type": "mountain",
+		"tags": ["mountain"],
 		"exits":        {"N": false, "E": false, "S": true, "W": false},
 		"entry_open":   {"N": false, "E": false, "S": true, "W": false},
 		"allowed_entry": ["S"],

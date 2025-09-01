@@ -80,7 +80,7 @@ func _ready() -> void:
 	_fade_reset_to_clear()
 
 	_load_room_at(RunState.pos, "res://rooms/room_start.tscn")
-	player.position = Vector2(SCREEN_SIZE.x / 2.0, SCREEN_SIZE.y / 2.0)
+	player.position = Vector2(SCREEN_SIZE.x / 2.0 + 16, SCREEN_SIZE.y / 2.0)
 	_update_hud()
 	_close_choice_panel()
 
@@ -186,34 +186,46 @@ func _propose_transition(dir: Vector2i) -> void:
 	_open_choice_panel()
 
 # Southmost row → only "beach"; Leftmost col → only "path"
+# --- kind helper used by edge constraints ---
+func _has_kind(def: Dictionary, kind: String) -> bool:
+	var k := kind.to_lower()
+	if def.has("type") and String(def["type"]).to_lower() == k:
+		return true
+	if def.has("tags") and def["tags"] is Array:
+		for t in def["tags"]:
+			if String(t).to_lower() == k:
+				return true
+	var name_s := String(def.get("name", "")).to_lower()
+	var path_s := String(def.get("path", "")).to_lower()
+	return name_s.findn(k) != -1 or path_s.findn(k) != -1
+
+
+# Southmost row → allow beach only there (forbid elsewhere)
+# Top row → allow mountain only there (forbid elsewhere)
+# Leftmost col → only "path" (unchanged rule)
 func _edge_constrained_candidates(base: Array, nx:int, ny:int) -> Array:
-
-	var want_kind := ""
-	if ny == GRID_H - 1:
-		want_kind = "beach"
-	elif nx == 0:
-		want_kind = "path"
-
-	if want_kind == "":
-		return base
+	# Far-left column: only path
+	if nx == 0:
+		var only_path: Array = []
+		for def in base:
+			if typeof(def) == TYPE_DICTIONARY and _has_kind(def, "path"):
+				only_path.append(def)
+		return only_path if only_path.size() > 0 else base
 
 	var filtered: Array = []
+	var forbid_beach := (ny != GRID_H - 1)
+	var forbid_mountain := (ny != 0)
+
 	for def in base:
-		if typeof(def) == TYPE_DICTIONARY:
-			if def.has("tags") and def["tags"] is Array:
-				for t in def["tags"]:
-					if String(t).to_lower() == want_kind:
-						filtered.append(def)
-						break
-			elif def.has("type") and String(def["type"]).to_lower() == want_kind:
-				filtered.append(def)
-			else:
+		if typeof(def) != TYPE_DICTIONARY:
+			continue
+		if forbid_beach and _has_kind(def, "beach"):
+			continue
+		if forbid_mountain and _has_kind(def, "mountain"):
+			continue
+		filtered.append(def)
 
-				var name_s := String(def.get("name", "")).to_lower()
-				var path_s := String(def.get("path", "")).to_lower()
-				if name_s.findn(want_kind) != -1 or path_s.findn(want_kind) != -1:
-					filtered.append(def)
-
+	# If everything got filtered (rare), fall back so the player isn't stuck
 	return filtered if filtered.size() > 0 else base
 
 func _on_option_pressed(index: int) -> void:
@@ -357,7 +369,7 @@ func _game_over() -> void:
 				RunState.new_run()
 				_clear_room()
 				_load_room_at(RunState.pos, "res://rooms/room_start.tscn")
-				player.position = Vector2(SCREEN_SIZE.x / 2.0, SCREEN_SIZE.y / 2.0)
+				player.position = Vector2(SCREEN_SIZE.x / 2.0 + 32, SCREEN_SIZE.y / 2.0 - 10)
 				_update_hud()
 				emit_signal("map_state_changed")
 
@@ -501,7 +513,7 @@ func _apply_edge_rocks(room: Node2D, room_path: String, coord: Vector2i) -> void
 	root.name = "__EdgeRocks"
 	room.add_child(root)
 
-
+	# 1) Is the edge blocked by neighbor/world?
 	var blocked := {
 		"N": _is_side_blocked_by_neighbor_or_edge(coord, "N"),
 		"E": _is_side_blocked_by_neighbor_or_edge(coord, "E"),
@@ -509,23 +521,39 @@ func _apply_edge_rocks(room: Node2D, room_path: String, coord: Vector2i) -> void
 		"W": _is_side_blocked_by_neighbor_or_edge(coord, "W"),
 	}
 
-	if blocked["W"]:
+	# 2) Does THIS room actually have an opening on that edge?
+	#    (If no opening here, we don't paint rocks.)
+	var open_here := {
+		"N": map_is_side_open_here(coord, "N"),
+		"E": map_is_side_open_here(coord, "E"),
+		"S": map_is_side_open_here(coord, "S"),
+		"W": map_is_side_open_here(coord, "W"),
+	}
+
+	# Place rocks only when it's blocked AND we have an opening here
+	var place := {
+		"N": blocked["N"] and open_here["N"],
+		"E": blocked["E"] and open_here["E"],
+		"S": blocked["S"] and open_here["S"],
+		"W": blocked["W"] and open_here["W"],
+	}
+
+	if place["W"]:
 		for row in range(MAP_H):
 			var p := _edge_pos_for_cell("W", 0, row)
 			_spawn_rock(root, p)
 
-	if blocked["E"]:
+	if place["E"]:
 		for row in range(MAP_H):
 			var p := _edge_pos_for_cell("E", MAP_W - 1, row)
 			_spawn_rock(root, p)
 
-	if blocked["N"]:
+	if place["N"]:
 		for col in range(MAP_W):
-
 			var p := _edge_pos_for_cell("N", col, 0)
 			_spawn_rock(root, p)
 
-	if blocked["S"]:
+	if place["S"]:
 		for col in range(MAP_W):
 			var p := _edge_pos_for_cell("S", col, MAP_H - 1)
 			_spawn_rock(root, p)
