@@ -14,7 +14,6 @@ class_name NPC
 	"",
 	"My dad used to go fishing on the area north of our house but now I can't find him."
 ]
-
 @export var portrait_face: Texture2D
 
 # ---- Trade / Need ----
@@ -22,6 +21,7 @@ class_name NPC
 @export var required_amount: int = 1
 @export var trade_uid: String = ""
 @export var take_on_talk: bool = true
+@export var intro_once: bool = true  # say need once first, then trade on next talk
 
 @export var lines_before: PackedStringArray = []
 @export var lines_on_give: PackedStringArray = []
@@ -39,8 +39,8 @@ func _ready() -> void:
 
 	# Visual
 	if sprite_path != "":
-		var tex: Resource = load(sprite_path)
-		if tex is Texture2D:
+		var tex: Texture2D = load(sprite_path) as Texture2D
+		if tex != null:
 			spr.texture = tex
 	spr.z_index = z_index_sprite
 	self.z_index = z_index_sprite
@@ -57,7 +57,7 @@ func _ready() -> void:
 	collision_layer = GameConfig.WALL_LAYER
 	collision_mask  = GameConfig.WALL_MASK
 
-# ScreenManager calls this; we also handle trade here.
+# ScreenManager calls this; we also handle the quest/trade here.
 func get_dialog_lines() -> PackedStringArray:
 	# No trade configured → plain dialogue
 	if required_item_id == "" or trade_uid == "":
@@ -65,9 +65,15 @@ func get_dialog_lines() -> PackedStringArray:
 
 	var rs: Node = get_node_or_null("/root/RunState")
 
-	# Already done this trade?
+	# Already completed this trade?
 	if rs and rs.has_method("was_trade_done") and rs.call("was_trade_done", trade_uid):
 		return _choose_nonempty(lines_after, _choose_nonempty(dialog_lines, ["Thanks again!"]))
+
+	# Show the "need" once first, even if the player already has the item.
+	if intro_once and rs and rs.has_method("was_need_intro") and not rs.call("was_need_intro", trade_uid):
+		if rs.has_method("mark_need_intro"):
+			rs.call("mark_need_intro", trade_uid)
+		return _choose_nonempty(lines_before, _choose_nonempty(dialog_lines, ["Hello."]))
 
 	# Check inventories (both, if present)
 	var invs: Array[Node] = _get_inventories()
@@ -78,12 +84,12 @@ func get_dialog_lines() -> PackedStringArray:
 		return _choose_nonempty(lines_before,
 			_choose_nonempty(dialog_lines, ["Have you seen my %s?" % required_item_id]))
 
-	# We have enough → consume from ALL inventories we find, then reward, then refresh
+	# We have enough → consume, reward, mark done, refresh UI
 	if take_on_talk:
 		for inv2 in invs:
 			_inv_remove(inv2, required_item_id, required_amount)
 		if reward_item_id != "":
-			var give_amt = max(1, reward_amount)
+			var give_amt: int = max(1, reward_amount)
 			for inv3 in invs:
 				_inv_add(inv3, reward_item_id, give_amt)
 		for inv4 in invs:
@@ -93,8 +99,7 @@ func get_dialog_lines() -> PackedStringArray:
 			rs.call("mark_trade_done", trade_uid)
 
 		_refresh_map_hud()
-
-		return _choose_nonempty(lines_on_give, ["(She takes your %s.)" % required_item_id])
+		return _choose_nonempty(lines_on_give, ["(They take your %s.)" % required_item_id])
 
 	# Not auto-taking: prompt
 	return _choose_nonempty(lines_before, ["Could I have your %s?" % required_item_id])
@@ -133,11 +138,11 @@ func _inv_count(inv: Node, id: String) -> int:
 	if inv.has_method("quantity_of"): return int(inv.call("quantity_of", id))
 	if inv.has_method("qty_of"):      return int(inv.call("qty_of", id))
 	# As a last resort (dictionary-like stores)
-	var dict_candidates: Array[String] = ["items","counts","store","bag","inventory","_items","_counts"]  # typing fix
+	var dict_candidates: Array[String] = ["items","counts","store","bag","inventory","_items","_counts"]
 	for k in dict_candidates:
-		var dv: Variant = inv.get(k)  # typing fix
+		var dv: Variant = inv.get(k)
 		if typeof(dv) == TYPE_DICTIONARY:
-			var d: Dictionary = dv     # typing fix
+			var d: Dictionary = dv
 			return int(d.get(id, 0))
 	return 0
 
@@ -176,11 +181,11 @@ func _inv_add(inv: Node, id: String, amt: int) -> void:
 		_dict_increment(inv, id, amt)
 
 func _dict_decrement(inv: Node, id: String, amt: int) -> void:
-	var keys: Array[String] = ["items","counts","store","bag","inventory","_items","_counts"]  # typing fix
+	var keys: Array[String] = ["items","counts","store","bag","inventory","_items","_counts"]
 	for k in keys:
-		var dv: Variant = inv.get(k)  # typing fix
+		var dv: Variant = inv.get(k)
 		if typeof(dv) == TYPE_DICTIONARY:
-			var d: Dictionary = dv     # typing fix
+			var d: Dictionary = dv
 			var n: int = int(d.get(id, 0)) - amt
 			if n <= 0:
 				d.erase(id)
@@ -190,11 +195,11 @@ func _dict_decrement(inv: Node, id: String, amt: int) -> void:
 			return
 
 func _dict_increment(inv: Node, id: String, amt: int) -> void:
-	var keys: Array[String] = ["items","counts","store","bag","inventory","_items","_counts"]  # typing fix
+	var keys: Array[String] = ["items","counts","store","bag","inventory","_items","_counts"]
 	for k in keys:
-		var dv: Variant = inv.get(k)  # typing fix
+		var dv: Variant = inv.get(k)
 		if typeof(dv) == TYPE_DICTIONARY:
-			var d: Dictionary = dv     # typing fix
+			var d: Dictionary = dv
 			d[id] = int(d.get(id, 0)) + amt
 			inv.set(k, d)
 			return

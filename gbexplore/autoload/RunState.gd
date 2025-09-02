@@ -29,6 +29,11 @@ var _npc_trades := {}  # uid -> true
 func was_trade_done(uid: String) -> bool: return bool(_npc_trades.get(uid, false))
 func mark_trade_done(uid: String) -> void: _npc_trades[uid] = true
 
+# Has the NPC already explained their need this run?
+var _npc_need_intro := {}  # uid -> true
+func was_need_intro(uid: String) -> bool: return bool(_npc_need_intro.get(uid, false))
+func mark_need_intro(uid: String) -> void: _npc_need_intro[uid] = true
+
 
 func was_chest_opened(uid: String) -> bool:
 	return bool(_opened_chests.get(uid, false))
@@ -186,7 +191,7 @@ var ROOM_DEFS := [
 				"amount": 1,
 				"uid": "girl_book_01",  # unique per run/quest
 				"lines_before": ["Have you seen my book?"],
-				"lines_on_give": ["Oh! You found it—thank you!"],
+				"lines_on_give": ["Oh! You found it—thank you! Take this shrimp as a reward. My dad will tell you more about it."],
 				"lines_after": ["I'm busy reading now!"],
 				# optional reward:
 				"reward": {"item_id": "shrimp", "amount": 1}
@@ -205,15 +210,33 @@ var ROOM_DEFS := [
 		"unique": true
 	},
 	{
-		"path": "res://rooms/room_hut.tscn",
-		"name": "Hut",
-		"type": "lake",
-		"tags": ["land","water"],
-		"exits":      {"N": false, "E": true, "S": false, "W": true},
-		"entry_open": {"N": false, "E": true, "S": false, "W": true},
-		"weight": 2, 
-		"unique": true
-	},
+	"path": "res://rooms/room_hut.tscn",
+	"name": "Hut",
+	"type": "lake",
+	"tags": ["land","water"],
+	"exits":      {"N": false, "E": true, "S": false, "W": true},
+	"entry_open": {"N": false, "E": true, "S": false, "W": true},
+	"weight": 2,
+	"unique": true,
+
+	"npcs": [
+		{
+			"sprite": "res://npc/fisherman.png",
+			"tile": Vector2i(4, 4),
+			"lines": ["Hello."],
+			"need": {
+				"item_id": "shrimp",
+				"amount": 1,
+				"uid": "fisherman_shrimp_01",   # << unique for this quest
+				"lines_before": ["Do you have a shrimp?"],
+				"lines_on_give": ["Perfect bait—thanks!"],
+				"lines_after": ["Back to the lake!"],
+				"reward": {"item_id": "book", "amount": 1}
+			}
+		}
+	]
+}
+,
 	{
 		"path": "res://rooms/room_witch3.tscn",
 		"name": "Witch",
@@ -334,6 +357,7 @@ func new_run() -> void:
 	pos = START_POS            # <-- start in the middle of 8x8
 	used_unique.clear()
 	_npc_trades.clear()
+	_npc_need_intro.clear()
 
 # ---------------- Public API ----------------
 
