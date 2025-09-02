@@ -8,6 +8,11 @@ class_name NPC
 @export var collider_size: Vector2 = Vector2(12, 12)
 @export var z_index_sprite: int = 2
 
+# Optional: a general “intro” gate (not tied to trade). If set, we’ll show
+# dialog_lines once before any trade logic.
+@export var talk_uid: String = ""
+@export var show_intro_first: bool = true
+
 # ---- Dialogue (default / fallback) ----
 @export var dialog_lines: PackedStringArray = [
 	"Are you new here?",
@@ -21,7 +26,7 @@ class_name NPC
 @export var required_amount: int = 1
 @export var trade_uid: String = ""
 @export var take_on_talk: bool = true
-@export var intro_once: bool = true  # say need once first, then trade on next talk
+@export var intro_once: bool = true  # say intro/need once first, then handle trade next time
 
 @export var lines_before: PackedStringArray = []
 @export var lines_on_give: PackedStringArray = []
@@ -57,25 +62,34 @@ func _ready() -> void:
 	collision_layer = GameConfig.WALL_LAYER
 	collision_mask  = GameConfig.WALL_MASK
 
-# ScreenManager calls this; we also handle the quest/trade here.
+# ScreenManager calls this; we handle intro + quest/trade here.
 func get_dialog_lines() -> PackedStringArray:
-	# No trade configured → plain dialogue
+	var rs: Node = get_node_or_null("/root/RunState")
+
+	# 0) “General intro” gate (not tied to trade)
+	if show_intro_first and talk_uid != "" and rs and rs.has_method("was_need_intro"):
+		if not rs.call("was_need_intro", talk_uid):
+			if rs.has_method("mark_need_intro"):
+				rs.call("mark_need_intro", talk_uid)
+			# Prefer dialog_lines for intro; fall back to lines_before.
+			return _choose_nonempty(dialog_lines, _choose_nonempty(lines_before, ["Hello."]))
+
+	# 1) If no trade is configured → plain dialogue
 	if required_item_id == "" or trade_uid == "":
 		return _choose_nonempty(dialog_lines, ["Hello."])
 
-	var rs: Node = get_node_or_null("/root/RunState")
-
-	# Already completed this trade?
+	# 2) Already completed this trade?
 	if rs and rs.has_method("was_trade_done") and rs.call("was_trade_done", trade_uid):
 		return _choose_nonempty(lines_after, _choose_nonempty(dialog_lines, ["Thanks again!"]))
 
-	# Show the "need" once first, even if the player already has the item.
+	# 3) Trade “intro once”: show request/hint one time even if the player already has the item
 	if intro_once and rs and rs.has_method("was_need_intro") and not rs.call("was_need_intro", trade_uid):
 		if rs.has_method("mark_need_intro"):
 			rs.call("mark_need_intro", trade_uid)
+		# Prefer lines_before (quest hint), fallback to default lines.
 		return _choose_nonempty(lines_before, _choose_nonempty(dialog_lines, ["Hello."]))
 
-	# Check inventories (both, if present)
+	# 4) Check inventories for required item
 	var invs: Array[Node] = _get_inventories()
 	var have: int = 0
 	for inv in invs:
@@ -84,7 +98,7 @@ func get_dialog_lines() -> PackedStringArray:
 		return _choose_nonempty(lines_before,
 			_choose_nonempty(dialog_lines, ["Have you seen my %s?" % required_item_id]))
 
-	# We have enough → consume, reward, mark done, refresh UI
+	# 5) We have enough → consume, reward, mark done, refresh UI
 	if take_on_talk:
 		for inv2 in invs:
 			_inv_remove(inv2, required_item_id, required_amount)
@@ -101,7 +115,7 @@ func get_dialog_lines() -> PackedStringArray:
 		_refresh_map_hud()
 		return _choose_nonempty(lines_on_give, ["(They take your %s.)" % required_item_id])
 
-	# Not auto-taking: prompt
+	# 6) Not auto-taking: prompt
 	return _choose_nonempty(lines_before, ["Could I have your %s?" % required_item_id])
 
 # Optional editor/legacy path
@@ -113,7 +127,7 @@ func _on_interact() -> void:
 	if dlg == null:
 		push_warning("[NPC] DialogueBox not found at /root/Main/UI/DialogueBox")
 		return
-	dlg.open(get_dialog_lines(), face, "left")
+	dlg.call("open", get_dialog_lines(), face, "left")
 
 # ------------- helpers -------------
 func _choose_nonempty(primary: PackedStringArray, fallback: PackedStringArray) -> PackedStringArray:
@@ -207,5 +221,7 @@ func _dict_increment(inv: Node, id: String, amt: int) -> void:
 func _refresh_map_hud() -> void:
 	var map: Node = get_node_or_null("/root/Main/MapOverlay/MapRoot")
 	if map:
-		if map.has_method("refresh"): map.call("refresh")
-		elif map.has_method("queue_redraw"): map.call("queue_redraw")
+		if map.has_method("refresh"):
+			map.call("refresh")
+		elif map.has_method("queue_redraw"):
+			map.call("queue_redraw")

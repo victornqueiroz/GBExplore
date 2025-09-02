@@ -8,6 +8,7 @@ const GRID_W := 8
 const GRID_H := 8
 
 const START_ROOM_PATH := "res://rooms/room_start.tscn"
+var start_room_path: String = START_ROOM_PATH   # <— use this everywhere instead of the const
 
 # With an even grid, there are 4 “central” tiles; we’ll pick (4,4)
 const START_POS := Vector2i(GRID_W / 2, GRID_H / 2)   # -> (4, 4)
@@ -41,6 +42,78 @@ func was_chest_opened(uid: String) -> bool:
 func mark_chest_opened(uid: String) -> void:
 	_opened_chests[uid] = true
 	
+# -------- Tutorial / Act 1 ----------
+enum GameMode { FREE, TUTORIAL }
+var game_mode: int = GameMode.FREE
+var tutorial_step: int = -1                      # -1 means inactive
+var tutorial_overrides := {}                     # coord -> { "npcs":[], "pickups":[], ... }
+var tutorial_hint_point: Vector2i = Vector2i(-1, -1)   # marker on the map (e.g. top-left)
+
+# Start/End
+func start_tutorial() -> void:
+	start_room_path = "res://rooms/tutorial_start.tscn"
+	game_mode = GameMode.TUTORIAL
+	new_run()
+	tutorial_step = 0
+	tutorial_overrides.clear()
+	tutorial_hint_point = Vector2i(-1, -1)
+	print("[TUT] started")
+
+func end_tutorial() -> void:
+	game_mode = GameMode.FREE
+	tutorial_step = -1
+	tutorial_overrides.clear()
+	tutorial_hint_point = Vector2i(-1, -1)
+	start_room_path = START_ROOM_PATH
+
+# Tutorial beats (each entry fixes the draft options and can inject content)
+# We keep everything moving EAST to match your description.
+var TUTORIAL_STEPS := [
+	{ # 0) From start → only a Path to the EAST
+		"entry": "W",
+		"paths": ["res://rooms/tutorial_path.tscn"]
+	},
+	
+	{ # 1) East again → Village with the Girl (intro: wants a book from the forest)
+		"entry": "W",
+		"paths": ["res://rooms/tutorial_girl_path.tscn"],
+		"overrides": {
+			"npcs": [ {
+				"sprite": "res://npc/girl.png",
+				"tile": Vector2i(4,4),
+				"lines": [
+					"I'm looking for a book I dropped in the forest, but I can't even find the forest anymore…",
+					"Can you help me?"
+				],
+				# she wants a book; when you give it later she'll deliver extra lines
+				"need": {
+					"item_id":"book", "amount":1, "uid":"tut_girl_book",
+					"lines_on_give":[
+						"You found a book—thank you!",
+						"…Wait, this isn’t mine. The cover has a tower.",
+						"That MAP you’re carrying—my dad studies maps.",
+						"Please take it to him. He’s out fishing somewhere nearby."
+					],
+					"lines_after":[ "I'll keep looking. Try asking my dad about that map!" ]
+				},
+				# tell the tutorial we’ve shown her intro once
+				"talk_uid":"tut_girl_intro"
+			} ]
+		}
+	},
+	{ # 2) East again → show *three* choices: two Paths + one Forest
+		"entry": ["N", "S"],
+		"paths": [
+			"res://rooms/room_path2.tscn",
+			"res://rooms/room_path3.tscn",
+			"res://rooms/room_forest.tscn"
+		],
+		# If Forest is chosen, we’ll inject a BOOK pickup in that placed forest room.
+		# (We don’t know coord at draft time; we’ll attach on pick.)
+	}
+]
+
+	
 # ---------------- Room Definitions ----------------
 # Keys:
 #   path:String, name:String, tags:Array, type:String (optional but useful for filters)
@@ -65,6 +138,41 @@ var ROOM_DEFS := [
 		"pickups": [
 			{"x": 2, "y": 4, "item_id": "book", "amount": 1, "uid": "book", "auto": false}],
 		"draftable": false
+	},
+	{
+		"path": "res://rooms/tutorial_start.tscn",
+		"name": "Start",
+		"type": "land",
+		"tags": ["start", "tutorial"],
+		"exits":      {"N": false, "E": true, "S": false, "W": false},
+		"entry_open": {"N": false, "E": true, "S": false, "W": false},
+		"weight": 4,
+		"unique": true,
+		"draftable": false
+	},
+	{
+		"path": "res://rooms/tutorial_path.tscn",
+		"name": "???",
+		"type": "land",
+		"tags": ["path", "tutorial"],
+		"exits":      {"N": false, "E": true, "S": false, "W": true},
+		"entry_open": {"N": false, "E": true, "S": false, "W": true},
+		"weight": 4,
+		"pickups": [
+			{"x": 4, "y": 4, "item_id": "map", "amount": 1, "uid": "map", "auto": false}],
+		"unique": true,
+		"draftable": true
+	},
+	{
+		"path": "res://rooms/tutorial_girl_path.tscn",
+		"name": "Path",
+		"type": "land",
+		"tags": ["path", "tutorial"],
+		"exits":      {"N": true, "E": false, "S": true, "W": true},
+		"entry_open": {"N": true, "E": false, "S": true, "W": true},
+		"weight": 4,
+		"unique": true,
+		"draftable": true
 	},
 	{
 		"path": "res://rooms/room_start2.tscn",
@@ -347,7 +455,8 @@ func _get_room_pool_paths() -> Array:
 	return a
 
 func _ready() -> void:
-	new_run()
+	start_tutorial()
+	#new_run()
 
 func new_run() -> void:
 	seed = int(Time.get_unix_time_from_system())
@@ -637,6 +746,84 @@ func was_item_picked(uid: String) -> bool: return bool(_picked_items.get(uid, fa
 func mark_item_picked(uid: String) -> void: _picked_items[uid] = true
 
 
+# Constrain draft when a tutorial beat is active for this entry side
+func pick_room_candidates_for_tutorial(entry_side: String, coord: Vector2i, count: int) -> Array:
+	if game_mode != GameMode.TUTORIAL or tutorial_step < 0 or tutorial_step >= TUTORIAL_STEPS.size():
+		return []
 
-# If you reset these on new runs, clear _picked_items in your reset flow,
-# just like you do for chests (if applicable).
+	var step = TUTORIAL_STEPS[tutorial_step]
+
+	# Allow "entry" to be a String (single side) or Array (multiple sides)
+	if step.has("entry"):
+		var e = step["entry"]
+		var is_match := false
+		if typeof(e) == TYPE_STRING:
+			is_match = (String(e) == entry_side)
+		elif typeof(e) == TYPE_ARRAY:
+			var arr: Array = e
+			is_match = (entry_side in arr)
+		if not is_match:
+			return []
+
+	var out: Array = []
+	var paths: Array = step.get("paths", [])
+	for p in paths:
+		var d := get_def_by_path(String(p))
+		if d.size() > 0:
+			out.append(d)
+	return out
+
+
+# Called from ScreenManager after the player chooses a draft option
+func notify_room_picked(coord: Vector2i, path: String) -> void:
+	if game_mode != GameMode.TUTORIAL: return
+	if tutorial_step < 0 or tutorial_step >= TUTORIAL_STEPS.size(): return
+
+	var step = TUTORIAL_STEPS[tutorial_step]
+	# Attach per-tile overrides for this coord
+	if step.has("overrides"):
+		tutorial_overrides[coord] = step["overrides"]
+
+	# Special: if this step offered the forest, and the player picked a forest,
+	# inject the BOOK pickup into THAT forest's overrides.
+	if tutorial_step == 3 and get_def_by_path(path).get("type","") == "forest":
+		tutorial_overrides[coord] = {
+			"pickups": [ { "tile": Vector2i(4,4), "item_id":"book", "amount":1, "uid":"tut_book_01" } ]
+		}
+
+	# Advance to next scripted beat
+	tutorial_step += 1
+	if tutorial_step >= TUTORIAL_STEPS.size():
+		# From now on you’re in free play, but the story continues (girl trade, hut talk, etc.)
+		end_tutorial()
+
+# When spawners ask for the room def, merge in per-tile overrides (NPCs/pickups) if any.
+func get_def_for_spawn(path: String, coord: Vector2i) -> Dictionary:
+	var base := get_def_by_path(path).duplicate(true)
+	if game_mode == GameMode.TUTORIAL and tutorial_overrides.has(coord):
+		var ov: Dictionary = tutorial_overrides[coord]
+		for k in ["npcs","pickups","chests"]:
+			if ov.has(k): base[k] = ov[k]
+	return base
+
+func on_item_picked(uid: String) -> void:
+	if game_mode != GameMode.TUTORIAL: return
+	if uid == "tut_map_01" and tutorial_step < 2:
+		# Player got the map; next beat is the village intro
+		tutorial_step = 2
+
+func on_npc_first_talk(uid: String) -> void:
+	if game_mode != GameMode.TUTORIAL: return
+	if uid == "tut_girl_intro" and tutorial_step < 3:
+		# We showed the girl's “please help” lines once
+		tutorial_step = 3
+
+func on_trade_done(uid: String) -> void:
+	if game_mode != GameMode.TUTORIAL: return
+	if uid == "tut_girl_book":
+		# After giving the book, we’ll look for the fisherman
+		# When the fisherman talks, we’ll set a map marker (see NPC hook below)
+		pass
+
+func set_tutorial_hint_top_left() -> void:
+	tutorial_hint_point = Vector2i(0, 0)    # mark top-left

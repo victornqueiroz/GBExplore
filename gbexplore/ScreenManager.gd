@@ -79,8 +79,10 @@ func _ready() -> void:
 
 	# make sure the fade overlay starts fully transparent
 	_fade_reset_to_clear()
+	
+	RunState.start_tutorial()
 
-	_load_room_at(RunState.pos, "res://rooms/room_start.tscn")
+	_load_room_at(RunState.pos, RunState.start_room_path)
 	player.position = Vector2(SCREEN_SIZE.x / 2.0 + 16, SCREEN_SIZE.y / 2.0)
 	_update_hud()
 	_close_choice_panel()
@@ -154,6 +156,8 @@ func _propose_transition(dir: Vector2i) -> void:
 	# New destination: pick candidates
 	var entry_side := _entry_side_for_dir(dir)
 	var base_candidates: Array = RunState.pick_room_candidates(entry_side, 12)
+	var tut: Array = RunState.pick_room_candidates_for_tutorial(entry_side, next, 12)
+	if tut.size() > 0: base_candidates = tut
 
 	# constrain options at map edges
 	var nx := next.x
@@ -238,7 +242,9 @@ func _on_option_pressed(index: int) -> void:
 	RunState.visited[next] = path
 	if "mark_used_if_unique" in RunState:
 		RunState.mark_used_if_unique(def)
-
+	if "notify_room_picked" in RunState:
+		RunState.notify_room_picked(next, path)
+		
 	emit_signal("map_state_changed")
 
 	# Can we enter from this side NOW?
@@ -289,7 +295,6 @@ func _do_room_swap(next_coord: Vector2i, path: String) -> void:
 	elif pending_dir == Vector2i(0, 1):
 		spawn = Vector2((mid_col + 0.5) * TILE, (0 + 0.5) * TILE)
 
-	# Load and add the new room
 	var ps := load(path)
 	if ps == null:
 		push_error("Could not load room: " + path)
@@ -304,25 +309,22 @@ func _do_room_swap(next_coord: Vector2i, path: String) -> void:
 		_apply_edge_blockers(room, path, next_coord)
 
 	# --- NPCs, chests, pickups ---
-	_spawn_npcs(room, path)
-	_spawn_chests(room, path)
-	_spawn_pickups(room, path)
+	_spawn_npcs(room, path, next_coord)
+	_spawn_chests(room, path, next_coord)
+	_spawn_pickups(room, path, next_coord)
 
 	# Update run state + spawn player
 	RunState.pos = next_coord
 	player.position = spawn
 
-	# Close choice UI if still open
 	if choice_panel.visible:
 		_close_choice_panel()
 
-	# Steps/HUD
 	RunState.steps_left -= 1
 	_update_hud()
 	if RunState.steps_left <= 0:
 		_game_over()
 
-	# Map overlay refresh
 	if map_overlay and map_overlay.visible:
 		map_overlay.refresh()
 
@@ -362,7 +364,7 @@ func _game_over() -> void:
 
 				RunState.new_run()
 				_clear_room()
-				_load_room_at(RunState.pos, "res://rooms/room_start.tscn")
+				_load_room_at(RunState.pos, RunState.start_room_path)
 				player.position = Vector2(SCREEN_SIZE.x / 2.0 + 32, SCREEN_SIZE.y / 2.0 - 10)
 				_update_hud()
 				emit_signal("map_state_changed")
@@ -378,7 +380,7 @@ func _game_over() -> void:
 		# Fallback if no FadeLayer
 		RunState.new_run()
 		_clear_room()
-		_load_room_at(RunState.pos, "res://rooms/room_start.tscn")
+		_load_room_at(RunState.pos, RunState.start_room_path)
 		player.position = Vector2(SCREEN_SIZE.x / 2.0, SCREEN_SIZE.y / 2.0)
 
 		_update_hud()
@@ -386,28 +388,25 @@ func _game_over() -> void:
 		is_transitioning = false
 		_game_over_running = false
 
-func _load_room_at(coord: Vector2i, path: String) -> void:
+func _load_room_at(at_coord: Vector2i, path: String) -> void:
 	var ps := load(path)
 	if ps == null:
 		push_error("Could not load room: " + path)
 		return
+
 	var room := (ps as PackedScene).instantiate()
 	screen_root.add_child(room)
-	RunState.visited[coord] = path
 
+	RunState.visited[at_coord] = path
 	emit_signal("map_state_changed")
 
-	# rocks for initial room
-	_apply_edge_rocks(room, path, coord)
-
-	# respect the flag
+	_apply_edge_rocks(room, path, at_coord)
 	if USE_EDGE_BLOCKERS:
-		_apply_edge_blockers(room, path, coord)
+		_apply_edge_blockers(room, path, at_coord)
 
-	# also spawn content for the starting room
-	_spawn_npcs(room, path)
-	_spawn_chests(room, path)
-	_spawn_pickups(room, path)
+	_spawn_npcs(room, path, at_coord)
+	_spawn_chests(room, path, at_coord)
+	_spawn_pickups(room, path, at_coord)
 
 # -------------------------------
 # Input / UI
@@ -802,8 +801,8 @@ func _dir_to_string(d: Vector2i) -> String:
 # -------------------------------
 # NPCs
 # -------------------------------
-func _spawn_npcs(room: Node2D, room_path: String) -> void:
-	var def: Dictionary = RunState.get_def_by_path(room_path)
+func _spawn_npcs(room: Node2D, room_path: String, coord: Vector2i) -> void:
+	var def: Dictionary = RunState.get_def_for_spawn(room_path, coord)
 	if def.size() == 0 or not def.has("npcs"):
 		return
 	var arr: Array = def["npcs"] as Array
@@ -902,8 +901,8 @@ func _on_dialog_finished() -> void:
 # -------------------------------
 # CHESTS
 # -------------------------------
-func _spawn_chests(room: Node2D, room_path: String) -> void:
-	var def: Dictionary = RunState.get_def_by_path(room_path)
+func _spawn_chests(room: Node2D, room_path: String, coord: Vector2i) -> void:
+	var def: Dictionary = RunState.get_def_for_spawn(room_path, coord)
 	if def.size() == 0 or not def.has("chests"):
 		return
 	var arr: Array = def["chests"] as Array
@@ -950,8 +949,8 @@ func _spawn_chests(room: Node2D, room_path: String) -> void:
 # -------------------------------
 # PICKUPS (data-driven ground items)
 # -------------------------------
-func _spawn_pickups(room: Node2D, room_path: String) -> void:
-	var def: Dictionary = RunState.get_def_by_path(room_path)
+func _spawn_pickups(room: Node2D, room_path: String, coord: Vector2i) -> void:
+	var def: Dictionary = RunState.get_def_for_spawn(room_path, coord)
 	if def.size() == 0 or not def.has("pickups"):
 		return
 	var arr: Array = def["pickups"] as Array

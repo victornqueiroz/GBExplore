@@ -1,4 +1,3 @@
-# res://actors/ItemPickup.gd
 extends Area2D
 class_name ItemPickup
 
@@ -19,8 +18,6 @@ func _ready() -> void:
 	# Make sure the area actually detects bodies
 	monitoring = true
 	monitorable = true
-	# (Optional) while debugging, you can broaden mask:
-	# collision_mask = 0xFFFFFFFF
 
 	# Wire signals exactly once
 	if not body_entered.is_connected(_on_body_entered):
@@ -43,9 +40,9 @@ func set_item_id(v: String) -> void:
 func _apply_icon() -> void:
 	if not is_instance_valid(_sprite):
 		return
-	var db := get_node_or_null("/root/ItemDb")
+	var db: Node = get_node_or_null("/root/ItemDb")
 	if db and db.has_method("get_item"):
-		var data = db.call("get_item", item_id)
+		var data: Variant = db.call("get_item", item_id)
 		if data and "icon" in data and data.icon:
 			_sprite.texture = data.icon
 			return
@@ -71,6 +68,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if event.is_action_pressed("interact") or event.is_action_pressed("ui_accept"):
 		_do_pickup()
+		get_viewport().set_input_as_handled()
 
 func _do_pickup() -> void:
 	if _taken:
@@ -78,8 +76,8 @@ func _do_pickup() -> void:
 	_taken = true
 
 	# Add to whichever inventory singleton your HUD uses
-	var added := false
-	var inv := get_node_or_null("/root/Inventory")
+	var added: bool = false
+	var inv: Node = get_node_or_null("/root/Inventory")
 	if inv and inv.has_method("add"):
 		inv.call("add", item_id, amount)
 		added = true
@@ -87,7 +85,7 @@ func _do_pickup() -> void:
 			inv.emit_signal("changed")
 
 	if not added:
-		var invL := get_node_or_null("/root/InventoryLoad")
+		var invL: Node = get_node_or_null("/root/InventoryLoad")
 		if invL:
 			if invL.has_method("add"):
 				invL.call("add", item_id, amount)
@@ -100,15 +98,16 @@ func _do_pickup() -> void:
 			added = true
 
 	# Mark as collected for this run
-	var run := get_node_or_null("/root/RunState")
+	var run: Node = get_node_or_null("/root/RunState")
 	if run and pickup_uid != "":
 		if run.has_method("mark_item_picked"):
 			run.call("mark_item_picked", pickup_uid)
 		elif run.has_method("mark_chest_opened"):
+			# backward-compat if you used chest flags for pickups before
 			run.call("mark_chest_opened", pickup_uid)
 
 	# Nudge HUD/map overlay to refresh
-	var map := get_node_or_null("/root/Main/MapOverlay/MapRoot")
+	var map: Node = get_node_or_null("/root/Main/MapOverlay/MapRoot")
 	if map:
 		if map.has_method("refresh"):
 			map.call("refresh")
@@ -116,14 +115,18 @@ func _do_pickup() -> void:
 			map.call("queue_redraw")
 
 	# Tiny confirmation
-	var itemdb := get_node_or_null("/root/ItemDb")
-	var pretty := item_id
+	var itemdb: Node = get_node_or_null("/root/ItemDb")
+	var pretty: String = item_id
 	if itemdb and itemdb.has_method("get_item"):
-		var data = itemdb.call("get_item", item_id)
-		if data and "name" in data and str(data.name) != "":
-			pretty = str(data.name)
-	var dlg := get_node_or_null("/root/Main/UI/DialogueBox")
-	if dlg and dlg.has_method("open"):
-		dlg.call("open", ["You picked up: %s x%d" % [pretty, amount]], null, "center")
+		var data2: Variant = itemdb.call("get_item", item_id)
+		if data2 and "name" in data2 and str(data2.name) != "":
+			pretty = str(data2.name)
 
+	var dlg: Node = get_node_or_null("/root/Main/UI/DialogueBox")
+	if dlg and dlg.has_method("open"):
+		dlg.call("open", PackedStringArray(["You picked up: %s x%d" % [pretty, amount]]), null, "left")
+
+	# Prevent double-triggers immediately
+	monitoring = false
+	visible = false
 	queue_free()
