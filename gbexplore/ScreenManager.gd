@@ -826,6 +826,25 @@ func _spawn_npcs(room: Node2D, room_path: String) -> void:
 		npc.set("tile_size", TILE)
 		if d.has("lines"):
 			npc.set("dialog_lines", d["lines"])
+		# --- NEW: wire up the "need" (trade) if present ---
+		if d.has("need") and d["need"] is Dictionary:
+			var need := d["need"] as Dictionary
+			if need.has("item_id"): npc.set("required_item_id", String(need["item_id"]))
+			if need.has("amount"):  npc.set("required_amount", int(need["amount"]))
+			if need.has("uid"):     npc.set("trade_uid", String(need["uid"]))
+			# texts
+			if need.has("lines_before"): npc.set("lines_before", need["lines_before"])
+			if need.has("lines_on_give"): npc.set("lines_on_give", need["lines_on_give"])
+			if need.has("lines_after"): npc.set("lines_after", need["lines_after"])
+			# reward
+			if need.has("reward") and need["reward"] is Dictionary:
+				var rw := need["reward"] as Dictionary
+				if rw.has("item_id"): npc.set("reward_item_id", String(rw["item_id"]))
+				if rw.has("amount"):  npc.set("reward_amount", int(rw["amount"]))
+			# auto-consume on talk (default true; override by passing "take_on_talk": false)
+			if need.has("take_on_talk"):
+				npc.set("take_on_talk", bool(need["take_on_talk"]))
+
 		root.add_child(npc)
 
 func _nearest_npc(max_dist: float = 18.0) -> StaticBody2D:

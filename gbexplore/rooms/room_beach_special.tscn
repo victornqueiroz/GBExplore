@@ -175,4 +175,3 @@ layer_0/tile_data = PackedInt32Array(0, 131072, 0, 1, 131072, 0, 2, 131072, 0, 3
 [node name="NPC" parent="." instance=ExtResource("2_dd7uo")]
 sprite_path = "res://npc/mermaid.png"
 tile = Vector2i(5, 5)
-dialog_lines = ["嗨，陌生人！", "我要返屋企，但我唔識游水。", "如果我有一條魔鬼魚，我就可以騎住佢⋯"]

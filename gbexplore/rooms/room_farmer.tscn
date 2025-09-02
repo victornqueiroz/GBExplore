@@ -174,4 +174,3 @@ layer_0/tile_data = PackedInt32Array(0, 0, 7, 1, 0, 7, 2, 0, 7, 3, 0, 7, 4, 6553
 [node name="NPC" parent="." instance=ExtResource("2_nlb7g")]
 sprite_path = "res://npc/farmer.png"
 tile = Vector2i(6, 3)
-dialog_lines = ["A crow stole my crops", "But I can't figure out which one was it", ""]

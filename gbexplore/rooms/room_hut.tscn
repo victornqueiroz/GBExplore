@@ -187,4 +187,3 @@ layer_0/tile_data = PackedInt32Array(0, 262144, 5, 1, 262144, 5, 2, 262144, 5, 3
 
 [node name="NPC" parent="." instance=ExtResource("2_ktiet")]
 sprite_path = "res://npc/fisherman.png"
-dialog_lines = ["Ahoy, traveler!", "", "These waters used to be full of fish."]

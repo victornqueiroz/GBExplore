@@ -24,6 +24,12 @@ var used_unique := {}
 # Track which chests were opened this run
 var _opened_chests := {}  # uid -> true
 
+# Track completed NPC trades (one-time interactions)
+var _npc_trades := {}  # uid -> true
+func was_trade_done(uid: String) -> bool: return bool(_npc_trades.get(uid, false))
+func mark_trade_done(uid: String) -> void: _npc_trades[uid] = true
+
+
 func was_chest_opened(uid: String) -> bool:
 	return bool(_opened_chests.get(uid, false))
 
@@ -94,6 +100,9 @@ var ROOM_DEFS := [
 		"exits":      {"N": true, "E": true, "S": true, "W": true},
 		"entry_open": {"N": true, "E": true, "S": true, "W": true},
 		"weight": 4,
+		"pickups": [
+		{"x": 4, "y": 4, "item_id": "shrimp", "amount": 1, "uid": "shrimp"}
+	],
 		"unique": true
 	},
 	{
@@ -104,9 +113,6 @@ var ROOM_DEFS := [
 		"exits":      {"N": false, "E": true, "S": true, "W": true},
 		"entry_open": {"N": false, "E": true, "S": true, "W": true},
 		"weight": 3,
-		"pickups": [
-		{"x": 4, "y": 4, "item_id": "shrimp", "amount": 1, "uid": "beach_shrimp_01"}
-	],
 		"unique": true
 	},
 	{
@@ -169,7 +175,23 @@ var ROOM_DEFS := [
 		"weight": 2,
 		"unique": true,
 		"npcs": [
-		{"sprite": "res://npc/girl.png", "tile": Vector2i(4, 3)}
+		{
+			"sprite": "res://npc/girl.png",
+			"tile": Vector2i(4, 3),
+			# Optional default lines if nothing special
+			"lines": ["Hi!"],
+			# NEW: the trade/need
+			"need": {
+				"item_id": "book",
+				"amount": 1,
+				"uid": "girl_book_01",  # unique per run/quest
+				"lines_before": ["Have you seen my book?"],
+				"lines_on_give": ["Oh! You found it—thank you!"],
+				"lines_after": ["I'm busy reading now!"],
+				# optional reward:
+				"reward": {"item_id": "shrimp", "amount": 1}
+			}
+		}
 	]
 	},
 	{
@@ -311,6 +333,7 @@ func new_run() -> void:
 	visited.clear()
 	pos = START_POS            # <-- start in the middle of 8x8
 	used_unique.clear()
+	_npc_trades.clear()
 
 # ---------------- Public API ----------------
 

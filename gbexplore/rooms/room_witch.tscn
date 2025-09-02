@@ -316,4 +316,3 @@ layer_0/tile_data = PackedInt32Array(0, 196608, 4, 65536, 327680, 4, 131072, 262
 
 [node name="NPC" parent="." instance=ExtResource("3_nijoa")]
 sprite_path = "res://npc/witch.png"
-dialog_lines = ["iHola!", "Usted quieres magica?", "Tiengo cogumelito para ti"]
