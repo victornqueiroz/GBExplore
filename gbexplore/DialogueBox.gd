@@ -26,6 +26,7 @@ signal finished
 # inset to keep the outer line fully inside the DialogueBox rect (prevents edge clipping)
 @export var border_outer_inset_px: int = 1
 
+
 const TYPE_SPEED := 60.0
 
 # ====== NODES ========================================================
@@ -33,7 +34,7 @@ const TYPE_SPEED := 60.0
 @onready var bg: ColorRect               = $BG
 @onready var container: MarginContainer  = $MarginContainer
 @onready var text: RichTextLabel         = $MarginContainer/RichTextLabel
-@onready var hint: Label                 = $MarginContainer/Label
+@onready var hint: Label = $Label 
 @onready var portrait: TextureRect       = $Portrait
 
 # ====== STATE ========================================================
@@ -71,7 +72,7 @@ func _apply_layout() -> void:
 	anchor_left = 0.0; anchor_right = 1.0
 	offset_left = screen_margin_side_px
 	offset_right = -screen_margin_side_px
-
+	
 	# height: fixed pixels; bottom-aligned with bottom margin
 	anchor_bottom = 1.0
 	anchor_top = 1.0
@@ -164,6 +165,17 @@ func _ready() -> void:
 	dimmer.color = _with_alpha(Color.BLACK, 0.0)
 
 	_ensure_code_border()
+	
+	# Make the text fill the container; containers ignore anchors, use size flags.
+	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	text.size_flags_vertical   = Control.SIZE_EXPAND_FILL
+
+	# Make sure the MarginContainer fills the DialogueBox rect.
+	container.anchor_left = 0.0;  container.anchor_right = 1.0
+	container.anchor_top  = 0.0;  container.anchor_bottom = 1.0
+	container.offset_left = 0;    container.offset_right = 0
+	container.offset_top  = 0;    container.offset_bottom = 0
+
 
 	# Text look
 	if ui_font:
@@ -183,8 +195,8 @@ func _ready() -> void:
 	hint.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
 	hint.anchor_left = 1.0; hint.anchor_right = 1.0
 	hint.anchor_top  = 1.0; hint.anchor_bottom = 1.0
-	hint.offset_left = -10; hint.offset_right = -6
-	hint.offset_top  = -12; hint.offset_bottom = -6
+	hint.offset_left = -24; hint.offset_right = -60
+	hint.offset_top  = -24; hint.offset_bottom = -40
 	hint.visible = false
 	hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hint.z_index = 220
@@ -313,7 +325,8 @@ func _gui_input(event: InputEvent) -> void:
 func _build_pages_by_label(lines: PackedStringArray) -> PackedStringArray:
 	var pages := PackedStringArray()
 	var page_buf := ""
-	var max_h: float = text.size.y
+	var max_h: float = _text_max_height()
+
 	if max_h <= 1.0:
 		max_h = max(size.y - 16.0, 64.0)
 	for para in lines:
@@ -355,3 +368,10 @@ func _place_portrait(side: String) -> void:
 	portrait.anchor_top = 0.0
 	portrait.offset_top = -h + 2   # change to 2 to place inside the bar
 	portrait.visible = true
+
+func _text_max_height() -> float:
+	var h: float = float(bar_height_px)
+	h -= 2.0 * float(inner_padding_px)
+	if use_code_border:
+		h -= float(border_outer_px + border_inner_px + 2*border_outer_inset_px + border_gap_px)
+	return max(h, 16.0)

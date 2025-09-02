@@ -101,9 +101,6 @@ layout_mode = 2
 theme_override_font_sizes/normal_font_size = 10
 scroll_active = false
 
-[node name="Label" type="Label" parent="UI/DialogueBox/MarginContainer"]
-layout_mode = 2
-
 [node name="Portrait" type="TextureRect" parent="UI/DialogueBox"]
 texture_filter = 1
 layout_mode = 0
@@ -111,6 +108,13 @@ offset_right = 1024.0
 offset_bottom = 1024.0
 texture = ExtResource("4_3dxm6")
 stretch_mode = 4
+
+[node name="Label" type="Label" parent="UI/DialogueBox"]
+layout_mode = 2
+offset_left = 8.0
+offset_top = 12.0
+offset_right = 119.0
+offset_bottom = 35.0
 
 [node name="FadeLayer" type="CanvasLayer" parent="UI"]
 script = ExtResource("4_fos0i")
