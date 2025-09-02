@@ -62,7 +62,6 @@ func start_tutorial() -> void:
 func end_tutorial() -> void:
 	game_mode = GameMode.FREE
 	tutorial_step = -1
-	tutorial_overrides.clear()
 	tutorial_hint_point = Vector2i(-1, -1)
 	start_room_path = START_ROOM_PATH
 
@@ -89,12 +88,14 @@ var TUTORIAL_STEPS := [
 				"need": {
 					"item_id":"book", "amount":1, "uid":"tut_girl_book",
 					"lines_on_give":[
-						"You found a book—thank you!",
-						"…Wait, this isn’t mine. The cover has a tower.",
-						"That MAP you’re carrying—my dad studies maps.",
+						"You found my book—thank you!",
+						"…Wait, this isn’t mine. This one's cover has a… tower.",
+						"And it does look exactly like the tower on this map you're holding!",
+						"Where did you get it?!",
+						"My dad is obsessed maps, he would LOVE to see your map.",
 						"Please take it to him. He’s out fishing somewhere nearby."
 					],
-					"lines_after":[ "I'll keep looking. Try asking my dad about that map!" ]
+					"lines_after":[ "I'll keep looking for my book. Try asking my dad about that map!" ]
 				},
 				# tell the tutorial we’ve shown her intro once
 				"talk_uid":"tut_girl_intro"
@@ -106,7 +107,7 @@ var TUTORIAL_STEPS := [
 		"paths": [
 			"res://rooms/room_path2.tscn",
 			"res://rooms/room_path3.tscn",
-			"res://rooms/room_forest.tscn"
+			"res://rooms/tutorial_forest.tscn"
 		],
 		# If Forest is chosen, we’ll inject a BOOK pickup in that placed forest room.
 		# (We don’t know coord at draft time; we’ll attach on pick.)
@@ -171,6 +172,19 @@ var ROOM_DEFS := [
 		"exits":      {"N": true, "E": false, "S": true, "W": true},
 		"entry_open": {"N": true, "E": false, "S": true, "W": true},
 		"weight": 4,
+		"unique": true,
+		"draftable": true
+	},
+	{
+		"path": "res://rooms/tutorial_forest.tscn",
+		"name": "Forest?",
+		"type": "land",
+		"tags": ["forest", "tutorial"],
+		"exits":      {"N": true, "E": false, "S": true, "W": false},
+		"entry_open": {"N": true, "E": false, "S": true, "W": false},
+		"weight": 4,
+		"pickups": [
+			{"x": 4, "y": 4, "item_id": "book", "amount": 1, "uid": "book", "auto": false}],
 		"unique": true,
 		"draftable": true
 	},
@@ -467,6 +481,7 @@ func new_run() -> void:
 	used_unique.clear()
 	_npc_trades.clear()
 	_npc_need_intro.clear()
+	tutorial_overrides.clear()
 
 # ---------------- Public API ----------------
 
@@ -798,13 +813,16 @@ func notify_room_picked(coord: Vector2i, path: String) -> void:
 		end_tutorial()
 
 # When spawners ask for the room def, merge in per-tile overrides (NPCs/pickups) if any.
+# --- 3) Always merge overrides for a placed coord, even in FREE mode ---
 func get_def_for_spawn(path: String, coord: Vector2i) -> Dictionary:
 	var base := get_def_by_path(path).duplicate(true)
-	if game_mode == GameMode.TUTORIAL and tutorial_overrides.has(coord):
+	if tutorial_overrides.has(coord):
 		var ov: Dictionary = tutorial_overrides[coord]
 		for k in ["npcs","pickups","chests"]:
-			if ov.has(k): base[k] = ov[k]
+			if ov.has(k):
+				base[k] = ov[k]
 	return base
+
 
 func on_item_picked(uid: String) -> void:
 	if game_mode != GameMode.TUTORIAL: return
