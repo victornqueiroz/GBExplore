@@ -7,6 +7,7 @@ const MAP_H := 9
 const SCREEN_SIZE := Vector2i(MAP_W * TILE, MAP_H * TILE)
 const EXIT_BAND := 4
 
+const ITEM_PICKUP_SCENE := preload("res://actors/ItemPickup.tscn")
 const NPC_SCENE := preload("res://NPC.tscn")
 const CHEST_SCENE := preload("res://actors/Chest.tscn")
 
@@ -55,7 +56,7 @@ const GAME_OVER_FADE_IN: float = 0.9
 	$UI/ChoicePanel/MarginContainer/VBoxContainer/Option3
 ]
 @onready var fade_layer: CanvasLayer = $UI/FadeLayer
-@onready var fade_black: ColorRect = $UI/ColorRect
+@onready var fade_black: ColorRect 
 @onready var map_overlay: Control = $MapOverlay/MapRoot
 @onready var dialog_box: Control = $UI/DialogueBox
 
@@ -145,7 +146,6 @@ func _propose_transition(dir: Vector2i) -> void:
 
 		if side_is_open:
 			_perform_transition(next, path_existing)
-
 		else:
 			_refresh_edge_blockers_for_current_room()
 			_refresh_edge_rocks_for_current_room()
@@ -153,7 +153,7 @@ func _propose_transition(dir: Vector2i) -> void:
 
 	# New destination: pick candidates
 	var entry_side := _entry_side_for_dir(dir)
-	var base_candidates: Array = RunState.pick_room_candidates(entry_side, 3)
+	var base_candidates: Array = RunState.pick_room_candidates(entry_side, 12)
 
 	# constrain options at map edges
 	var nx := next.x
@@ -166,7 +166,6 @@ func _propose_transition(dir: Vector2i) -> void:
 			var def: Dictionary = candidate_defs[i]
 			var nice: String = ""
 			if def.has("name"):
-
 				nice = String(def["name"])
 			else:
 				var pth: String = String(def.get("path", ""))
@@ -198,7 +197,6 @@ func _has_kind(def: Dictionary, kind: String) -> bool:
 	var name_s := String(def.get("name", "")).to_lower()
 	var path_s := String(def.get("path", "")).to_lower()
 	return name_s.findn(k) != -1 or path_s.findn(k) != -1
-
 
 # Southmost row → allow beach only there (forbid elsewhere)
 # Top row → allow mountain only there (forbid elsewhere)
@@ -241,7 +239,6 @@ func _on_option_pressed(index: int) -> void:
 	if "mark_used_if_unique" in RunState:
 		RunState.mark_used_if_unique(def)
 
-
 	emit_signal("map_state_changed")
 
 	# Can we enter from this side NOW?
@@ -262,7 +259,6 @@ func _on_option_pressed(index: int) -> void:
 # -------------------------------
 func _perform_transition(next_coord: Vector2i, path: String) -> void:
 	if not is_instance_valid(fade_layer):
-
 		_do_room_swap(next_coord, path)
 		return
 
@@ -284,7 +280,6 @@ func _do_room_swap(next_coord: Vector2i, path: String) -> void:
 	var mid_row := (MAP_H - 1) / 2
 	var spawn := Vector2(SCREEN_SIZE.x / 2.0, SCREEN_SIZE.y / 2.0)
 
-
 	if pending_dir == Vector2i(-1, 0):
 		spawn = Vector2((MAP_W - 1 + 0.5) * TILE, (mid_row + 0.5) * TILE)
 	elif pending_dir == Vector2i(1, 0):
@@ -304,14 +299,14 @@ func _do_room_swap(next_coord: Vector2i, path: String) -> void:
 	screen_root.add_child(room)
 
 	# Visual blockers / decorations
-
 	_apply_edge_rocks(room, path, next_coord)
 	if USE_EDGE_BLOCKERS:
 		_apply_edge_blockers(room, path, next_coord)
 
-	# --- NPCs & chests ---
+	# --- NPCs, chests, pickups ---
 	_spawn_npcs(room, path)
 	_spawn_chests(room, path)
+	_spawn_pickups(room, path)
 
 	# Update run state + spawn player
 	RunState.pos = next_coord
@@ -345,7 +340,6 @@ func _game_over() -> void:
 	if _game_over_running:
 		return
 	_game_over_running = true
-
 
 	# Allow movement, but stop room transitions during the sequence
 	is_transitioning = true
@@ -407,9 +401,13 @@ func _load_room_at(coord: Vector2i, path: String) -> void:
 	_apply_edge_rocks(room, path, coord)
 
 	# respect the flag
-
 	if USE_EDGE_BLOCKERS:
 		_apply_edge_blockers(room, path, coord)
+
+	# also spawn content for the starting room
+	_spawn_npcs(room, path)
+	_spawn_chests(room, path)
+	_spawn_pickups(room, path)
 
 # -------------------------------
 # Input / UI
@@ -428,7 +426,6 @@ func _open_choice_panel() -> void:
 
 func _close_choice_panel() -> void:
 	choice_panel.visible = false
-
 	if "set_input_enabled" in player:
 		player.set_input_enabled(true)
 
@@ -470,7 +467,6 @@ func _unhandled_input(event: InputEvent) -> void:
 	if map_overlay and map_overlay.visible:
 		return
 
-
 	# Interact with nearest NPC.
 	if event.is_action_pressed("interact") or event.is_action_pressed("ui_accept"):
 		var npc := _nearest_npc()
@@ -490,7 +486,6 @@ func _input(event: InputEvent) -> void:
 			if "set_input_enabled" in player:
 				player.set_input_enabled(not map_overlay.visible)
 			get_viewport().set_input_as_handled()
-
 
 # Simple feedback when trying to walk outside the 8x8 world
 func _show_no_exit_feedback(dir:String) -> void:
@@ -570,7 +565,6 @@ func _is_side_blocked_by_neighbor_or_edge(coord: Vector2i, side: String) -> bool
 		return false
 
 	var this_path := String(RunState.visited.get(coord, ""))
-
 	var neigh_path := String(RunState.visited.get(n, ""))
 	var this_open := RunState.entry_open_for_path(this_path, side)
 	var opp := _opp_side(side)
@@ -591,7 +585,6 @@ func _opp_side(side: String) -> String:
 	if side == "S": return "N"
 	if side == "E": return "W"
 	if side == "W": return "E"
-
 	return side
 
 # Position a rock along the edge centered on a tile's middle
@@ -612,7 +605,6 @@ func _spawn_rock(parent: Node, pos: Vector2) -> void:
 	var spr := Sprite2D.new()
 	spr.texture = ROCK_TEX
 	spr.position = pos
-
 	spr.z_index = ROCK_Z
 	spr.scale = ROCK_SCALE
 	parent.add_child(spr)
@@ -633,7 +625,6 @@ func _spawn_rock(parent: Node, pos: Vector2) -> void:
 # EDGE BLOCKERS (optional)
 # -------------------------------
 func _apply_edge_blockers(room: Node, room_path: String, coord: Vector2i = RunState.pos) -> void:
-
 	var open_N := true
 	var open_E := true
 	var open_S := true
@@ -654,7 +645,6 @@ func _apply_edge_blockers(room: Node, room_path: String, coord: Vector2i = RunSt
 			open_N = false
 		var ecoord := coord + Vector2i(1, 0)
 		if RunState.visited.has(ecoord) and not RunState.entry_open_for_path(String(RunState.visited[ecoord]), "W"):
-
 			open_E = false
 		var scoord := coord + Vector2i(0, 1)
 		if RunState.visited.has(scoord) and not RunState.entry_open_for_path(String(RunState.visited[scoord]), "N"):
@@ -675,7 +665,6 @@ func _apply_edge_blockers(room: Node, room_path: String, coord: Vector2i = RunSt
 	var over  := GameConfig.EDGE_OVERHANG
 	var zed   := GameConfig.EDGE_Z
 	var lay   := GameConfig.WALL_LAYER
-
 	var mask  := GameConfig.WALL_MASK
 
 	if not open_W:
@@ -696,7 +685,6 @@ func _add_wall(parent: Node, rect: Rect2, label: String, layer: int, mask: int, 
 	body.name = label
 	body.collision_layer = layer
 	body.collision_mask = mask
-
 	body.z_index = zed
 
 	var shape := CollisionShape2D.new()
@@ -704,6 +692,7 @@ func _add_wall(parent: Node, rect: Rect2, label: String, layer: int, mask: int, 
 	rshape.size = rect.size
 	shape.shape = rshape
 	body.position = rect.position + rect.size * 0.5
+	shape.position = Vector2.ZERO
 	body.add_child(shape)
 	parent.add_child(body)
 
@@ -737,7 +726,6 @@ func _refresh_edge_blockers_for_current_room() -> void:
 
 # Rebuild ROCKS for the CURRENT room using up-to-date neighbor info
 func _refresh_edge_rocks_for_current_room() -> void:
-
 	var room := _get_current_room()
 	if room == null:
 		return
@@ -758,7 +746,6 @@ func _def_open_map(def: Dictionary) -> Dictionary:
 		return def["entry_open"]
 	if def.has("exits"):
 		return def["exits"]
-
 	return {"N": true, "E": true, "S": true, "W": true}
 
 func _def_exit_sides(def: Dictionary) -> Array[String]:
@@ -789,13 +776,11 @@ func _exit_arrows_inline(def: Dictionary, entry_side: String) -> String:
 	if not def.has("entry_open"):
 		return ""
 	var eo: Dictionary = def["entry_open"]
-
 	var arrows := []
 	if eo.get("W", false) and entry_side != "W": arrows.append("←")
 	if eo.get("N", false) and entry_side != "N": arrows.append("↑")
 	if eo.get("S", false) and entry_side != "S": arrows.append("↓")
 	if eo.get("E", false) and entry_side != "E": arrows.append("→")
-
 	return " ".join(arrows)
 
 func _def_exit_tooltip(def: Dictionary) -> String:
@@ -895,6 +880,9 @@ func _on_dialog_finished() -> void:
 	if "set_input_enabled" in player:
 		player.set_input_enabled(true)
 
+# -------------------------------
+# CHESTS
+# -------------------------------
 func _spawn_chests(room: Node2D, room_path: String) -> void:
 	var def: Dictionary = RunState.get_def_by_path(room_path)
 	if def.size() == 0 or not def.has("chests"):
@@ -911,17 +899,90 @@ func _spawn_chests(room: Node2D, room_path: String) -> void:
 		if not (item is Dictionary):
 			continue
 		var d: Dictionary = item as Dictionary
+
+		# Skip if already opened (by UID), if your RunState tracks this
+		var uid := String(d.get("uid", ""))
+		if uid != "":
+			var skip := false
+			if "was_chest_opened" in RunState:
+				skip = RunState.was_chest_opened(uid)
+			if skip:
+				continue
+
 		var chest := CHEST_SCENE.instantiate()
 		if d.has("item_id"):
 			chest.set("item_id", String(d["item_id"]))
 		if d.has("amount"):
 			chest.set("amount", int(d["amount"]))
-		if d.has("uid"):
-			chest.set("chest_uid", String(d["uid"]))
+		if uid != "":
+			chest.set("chest_uid", uid)
+
+		# Position: prefer 'tile' Vector2i; otherwise {x,y}
 		if d.has("tile"):
 			var t: Vector2i = d["tile"]
 			chest.position = Vector2((t.x + 0.5) * TILE, (t.y + 0.5) * TILE)
+		else:
+			var cx := int(d.get("x", 0))
+			var cy := int(d.get("y", 0))
+			chest.position = Vector2((cx + 0.5) * TILE, (cy + 0.5) * TILE)
+
 		root.add_child(chest)
+
+# -------------------------------
+# PICKUPS (data-driven ground items)
+# -------------------------------
+func _spawn_pickups(room: Node2D, room_path: String) -> void:
+	var def: Dictionary = RunState.get_def_by_path(room_path)
+	if def.size() == 0 or not def.has("pickups"):
+		return
+	var arr: Array = def["pickups"] as Array
+	if arr.is_empty():
+		return
+
+	# Make a container so we can clear them cleanly on swap
+	if room.has_node("__Pickups"):
+		room.get_node("__Pickups").queue_free()
+	var root := Node2D.new()
+	root.name = "__Pickups"
+	room.add_child(root)
+
+	for item in arr:
+		if not (item is Dictionary):
+			continue
+		var d: Dictionary = item as Dictionary
+
+		var uid := String(d.get("uid", ""))
+		if uid != "":
+			var picked := false
+			if "was_item_picked" in RunState:
+				picked = RunState.was_item_picked(uid)
+			elif "was_chest_opened" in RunState:
+				# fallback if you haven't added item tracking yet
+				picked = RunState.was_chest_opened(uid)
+			if picked:
+				continue
+
+		var node := ITEM_PICKUP_SCENE.instantiate()
+
+		# set properties BEFORE add_child (so _ready uses the right item_id)
+		if d.has("item_id"): node.item_id = String(d["item_id"])
+		if d.has("amount"):  node.amount  = int(d["amount"])
+		if uid != "":        node.pickup_uid = uid
+		if d.has("auto"):    node.auto_pickup = bool(d["auto"])
+
+		# position
+		var pos: Vector2
+		if d.has("tile"):
+			var t: Vector2i = d["tile"]
+			pos = Vector2((t.x + 0.5) * TILE, (t.y + 0.5) * TILE)
+		else:
+			var px := int(d.get("x", 0))
+			var py := int(d.get("y", 0))
+			pos = Vector2((px + 0.5) * TILE, (py + 0.5) * TILE)
+		node.position = pos
+
+		# now add to the scene
+		root.add_child(node)
 
 # --- Map query helpers (used by MapRoot) ---
 func map_is_side_open_here(coord: Vector2i, side: String) -> bool:

@@ -1,0 +1,23 @@
+[gd_scene load_steps=4 format=3 uid="uid://ok7dkfiller6"]
+
+[ext_resource type="Script" uid="uid://drumxgi35e0bf" path="res://actors/ItemPickup.gd" id="1_oec2j"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_vtwq1"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_oec2j"]
+size = Vector2(16, 16)
+
+[node name="ItemPickup" type="Area2D"]
+script = ExtResource("1_oec2j")
+item_id = ""
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("RectangleShape2D_vtwq1")
+
+[node name="Blocker" type="StaticBody2D" parent="."]
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Blocker"]
+shape = SubResource("RectangleShape2D_oec2j")

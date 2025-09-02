@@ -5,6 +5,9 @@ var _by_id: Dictionary = {}
 
 func _ready() -> void:
 	var shrimp: ItemData = preload("res://items/shrimp.tres")
+	var book: ItemData = preload("res://items/book.tres")
+	
+	_register(book)
 	_register(shrimp)
 
 func _register(it: ItemData) -> void:

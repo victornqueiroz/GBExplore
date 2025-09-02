@@ -50,6 +50,9 @@ var ROOM_DEFS := [
 		"entry_open": {"N": false, "E": true, "S": false, "W": true},
 		"weight": 4,
 		"unique": true,
+		# NEW: pickups
+		"pickups": [
+			{"x": 2, "y": 4, "item_id": "book", "amount": 1, "uid": "book", "auto": false}],
 		"draftable": false
 	},
 	{
@@ -101,6 +104,9 @@ var ROOM_DEFS := [
 		"exits":      {"N": false, "E": true, "S": true, "W": true},
 		"entry_open": {"N": false, "E": true, "S": true, "W": true},
 		"weight": 3,
+		"pickups": [
+		{"x": 4, "y": 4, "item_id": "shrimp", "amount": 1, "uid": "beach_shrimp_01"}
+	],
 		"unique": true
 	},
 	{
@@ -577,3 +583,13 @@ func exit_access_map(coord: Vector2i) -> Dictionary:
 		"S": exit_is_accessible(coord, "S"),
 		"W": exit_is_accessible(coord, "W"),
 	}
+
+# In res://autoload/RunState.gd (near your chest vars)
+var _picked_items := {}
+func was_item_picked(uid: String) -> bool: return bool(_picked_items.get(uid, false))
+func mark_item_picked(uid: String) -> void: _picked_items[uid] = true
+
+
+
+# If you reset these on new runs, clear _picked_items in your reset flow,
+# just like you do for chests (if applicable).

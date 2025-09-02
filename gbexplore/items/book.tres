@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="ItemData" load_steps=3 format=3 uid="uid://lbtnlb3alwu0"]
+
+[ext_resource type="Texture2D" uid="uid://b16rk3y6oqehg" path="res://items/book.png" id="1_ups48"]
+[ext_resource type="Script" uid="uid://bid2jph5r7dp8" path="res://items/ItemData.gd" id="2_2nvir"]
+
+[resource]
+script = ExtResource("2_2nvir")
+id = "book"
+display_name = "book"
+icon = ExtResource("1_ups48")
+description = "A strange book."
+stackable = false
+metadata/_custom_type_script = "uid://bid2jph5r7dp8"
