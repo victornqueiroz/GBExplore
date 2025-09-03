@@ -102,16 +102,43 @@ var TUTORIAL_STEPS := [
 			} ]
 		}
 	},
+	{ # NEXT STEP after the girl room
+	# Apply ONLY when we are currently in tutorial_girl_path
+	"from_path": "res://rooms/tutorial_girl_path.tscn",
+
+	# Offer choices when the *target* room’s entry side is N or S
+	# (Moving North from the girl room => entry_side == "S". Moving South => entry_side == "N")
+	"entry_any": ["N", "S"],
+
+	# Direction-specific lists:
+	"paths_by_entry": {
+		# If player goes SOUTH from girl room (target room entry is N):
+		"N": [
+			"res://rooms/room_path.tscn",
+			"res://rooms/tutorial_forest.tscn"
+		],
+
+		# If player goes NORTH from girl room (target room entry is S):
+		"S": [
+			"res://rooms/tutorial_forest.tscn",
+			"res://rooms/room_path.tscn"
+		]
+	}
+}
+,
 	{ # 2) East again → show *three* choices: two Paths + one Forest
 		"entry": ["N", "S"],
 		"paths": [
-			"res://rooms/room_path2.tscn",
-			"res://rooms/room_path3.tscn",
+			#"res://rooms/room_path2.tscn",
+			#"res://rooms/room_path3.tscn",
+			"res://rooms/tutorial_forest.tscn",
+			"res://rooms/tutorial_forest.tscn",
 			"res://rooms/tutorial_forest.tscn"
 		],
 		# If Forest is chosen, we’ll inject a BOOK pickup in that placed forest room.
 		# (We don’t know coord at draft time; we’ll attach on pick.)
 	}
+	
 ]
 
 	
@@ -761,31 +788,46 @@ func was_item_picked(uid: String) -> bool: return bool(_picked_items.get(uid, fa
 func mark_item_picked(uid: String) -> void: _picked_items[uid] = true
 
 
-# Constrain draft when a tutorial beat is active for this entry side
 func pick_room_candidates_for_tutorial(entry_side: String, coord: Vector2i, count: int) -> Array:
 	if game_mode != GameMode.TUTORIAL or tutorial_step < 0 or tutorial_step >= TUTORIAL_STEPS.size():
 		return []
 
 	var step = TUTORIAL_STEPS[tutorial_step]
 
-	# Allow "entry" to be a String (single side) or Array (multiple sides)
-	if step.has("entry"):
-		var e = step["entry"]
-		var is_match := false
-		if typeof(e) == TYPE_STRING:
-			is_match = (String(e) == entry_side)
-		elif typeof(e) == TYPE_ARRAY:
-			var arr: Array = e
-			is_match = (entry_side in arr)
-		if not is_match:
+	# Optional: restrict to a specific current room
+	if step.has("from_path"):
+		var cur_path := String(visited.get(pos, ""))
+		if cur_path != String(step["from_path"]):
 			return []
 
+	# Allow either a single entry side or a set
+	if step.has("entry"):
+		if String(step["entry"]) != entry_side:
+			return []
+	if step.has("entry_any"):
+		var allowed: Array = step["entry_any"]
+		if not allowed.has(entry_side):
+			return []
+
+	# Decide which path list to use
+	var list_paths: Array = []
+	if step.has("paths_by_entry") and step["paths_by_entry"] is Dictionary:
+		var m: Dictionary = step["paths_by_entry"]
+		if not m.has(entry_side):
+			return []
+		list_paths = m[entry_side]
+	else:
+		list_paths = step.get("paths", [])
+
+	# Build defs
 	var out: Array = []
-	var paths: Array = step.get("paths", [])
-	for p in paths:
+	for p in list_paths:
 		var d := get_def_by_path(String(p))
 		if d.size() > 0:
 			out.append(d)
+
+	# Keep weighting/limit behavior consistent with your non-tutorial picker
+	# (but usually the tutorial lists are short)
 	return out
 
 
