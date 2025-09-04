@@ -8,7 +8,18 @@ const GRID_W := 8
 const GRID_H := 8
 
 const START_ROOM_PATH := "res://rooms/room_start.tscn"
-var start_room_path: String = START_ROOM_PATH   # <— use this everywhere instead of the const
+var start_room_path: String = START_ROOM_PATH   # use this everywhere instead of the const
+
+# ---- Curated draft rules ----
+# 1) Per-room rules: apply when current room path matches (keys are TARGET entry sides "N/E/S/W")
+var curated_drafts_by_path: Dictionary = {}   # path -> {"N":[paths], "S":[paths], ...}
+func set_draft_rules_for_room(path: String, rules: Dictionary) -> void:
+	curated_drafts_by_path[path] = rules.duplicate(true)
+
+# 2) Per-origin (coord) rules: apply when the player is on that EXACT tile they left from
+var _draft_rules_by_origin := {}     # coord -> { "N":[paths], "S":[paths], "E":[paths], "W":[paths] }
+func set_draft_rules_for_current_origin(rules: Dictionary) -> void:
+	_draft_rules_by_origin[pos] = rules.duplicate(true)
 
 # With an even grid, there are 4 “central” tiles; we’ll pick (4,4)
 const START_POS := Vector2i(GRID_W / 2, GRID_H / 2)   # -> (4, 4)
@@ -24,6 +35,10 @@ var used_unique := {}
 
 # Track which chests were opened this run
 var _opened_chests := {}  # uid -> true
+func was_chest_opened(uid: String) -> bool:
+	return bool(_opened_chests.get(uid, false))
+func mark_chest_opened(uid: String) -> void:
+	_opened_chests[uid] = true
 
 # Track completed NPC trades (one-time interactions)
 var _npc_trades := {}  # uid -> true
@@ -35,13 +50,6 @@ var _npc_need_intro := {}  # uid -> true
 func was_need_intro(uid: String) -> bool: return bool(_npc_need_intro.get(uid, false))
 func mark_need_intro(uid: String) -> void: _npc_need_intro[uid] = true
 
-
-func was_chest_opened(uid: String) -> bool:
-	return bool(_opened_chests.get(uid, false))
-
-func mark_chest_opened(uid: String) -> void:
-	_opened_chests[uid] = true
-	
 # -------- Tutorial / Act 1 ----------
 enum GameMode { FREE, TUTORIAL }
 var game_mode: int = GameMode.FREE
@@ -57,6 +65,7 @@ func start_tutorial() -> void:
 	tutorial_step = 0
 	tutorial_overrides.clear()
 	tutorial_hint_point = Vector2i(-1, -1)
+	_draft_rules_by_origin.clear()
 	print("[TUT] started")
 
 func end_tutorial() -> void:
@@ -64,16 +73,17 @@ func end_tutorial() -> void:
 	tutorial_step = -1
 	tutorial_hint_point = Vector2i(-1, -1)
 	start_room_path = START_ROOM_PATH
+	# Keep origin rules if you want curated pools to persist beyond the tutorial.
+	# _draft_rules_by_origin.clear()
 
-# Tutorial beats (each entry fixes the draft options and can inject content)
-# We keep everything moving EAST to match your description.
+# Tutorial beats
 var TUTORIAL_STEPS := [
-	{ # 0) From start → only a Path to the EAST
+	{ # 0) From start → only a Path to the EAST (moving E => target entry side is "W")
 		"entry": "W",
 		"paths": ["res://rooms/tutorial_path.tscn"]
 	},
-	
-	{ # 1) East again → Village with the Girl (intro: wants a book from the forest)
+
+	{ # 1) Next → Village/Girl path
 		"entry": "W",
 		"paths": ["res://rooms/tutorial_girl_path.tscn"],
 		"overrides": {
@@ -84,7 +94,6 @@ var TUTORIAL_STEPS := [
 					"I'm looking for a book I dropped in the forest, but I can't even find the forest anymore…",
 					"Can you help me?"
 				],
-				# she wants a book; when you give it later she'll deliver extra lines
 				"need": {
 					"item_id":"book", "amount":1, "uid":"tut_girl_book",
 					"lines_on_give":[
@@ -92,66 +101,48 @@ var TUTORIAL_STEPS := [
 						"…Wait, this isn’t mine. This one's cover has a… tower.",
 						"And it does look exactly like the tower on this map you're holding!",
 						"Where did you get it?!",
-						"My dad is obsessed maps, he would LOVE to see your map.",
+						"My dad is obsessed with maps—he would LOVE to see your map.",
 						"Please take it to him. He’s out fishing somewhere nearby."
 					],
 					"lines_after":[ "I'll keep looking for my book. Try asking my dad about that map!" ]
 				},
-				# tell the tutorial we’ve shown her intro once
 				"talk_uid":"tut_girl_intro"
 			} ]
 		}
 	},
-	{ # NEXT STEP after the girl room
-	# Apply ONLY when we are currently in tutorial_girl_path
-	"from_path": "res://rooms/tutorial_girl_path.tscn",
 
-	# Offer choices when the *target* room’s entry side is N or S
-	# (Moving North from the girl room => entry_side == "S". Moving South => entry_side == "N")
-	"entry_any": ["N", "S"],
+	{ # 2) From the GIRL ROOM: curated choices when moving N or S
+		"from_path": "res://rooms/tutorial_girl_path.tscn",
+		"entry_any": ["N", "S"],    # target room's entry side (N when moving SOUTH, S when moving NORTH)
+		"paths_by_entry": {
+			"N": [  # moving SOUTH from girl room -> target entry "N"
+				"res://rooms/tutorial_path1.tscn",
+				"res://rooms/tutorial_forest.tscn"
+			],
+			"S": [  # moving NORTH from girl room -> target entry "S"
+				"res://rooms/tutorial_forest.tscn",
+				"res://rooms/tutorial_path1.tscn"
+			]
+		}
+	},
 
-	# Direction-specific lists:
-	"paths_by_entry": {
-		# If player goes SOUTH from girl room (target room entry is N):
-		"N": [
-			"res://rooms/room_path.tscn",
-			"res://rooms/tutorial_forest.tscn"
-		],
-
-		# If player goes NORTH from girl room (target room entry is S):
-		"S": [
-			"res://rooms/tutorial_forest.tscn",
-			"res://rooms/room_path.tscn"
-		]
+	{ # 2) From the GIRL ROOM: curated choices when moving N or S
+		"from_path": "res://rooms/tutorial_forest.tscn",
+		"entry_any": ["N", "S"],    # target room's entry side (N when moving SOUTH, S when moving NORTH)
+		"paths_by_entry": {
+			"N": [  # moving SOUTH from girl room -> target entry "N"
+				"res://rooms/room_path1.tscn",
+				"res://rooms/tutorial_forest.tscn"
+			],
+			"S": [  # moving NORTH from girl room -> target entry "S"
+				"res://rooms/tutorial_forest.tscn",
+				"res://rooms/room_path1.tscn"
+			]
+		}
 	}
-}
-,
-	{ # 2) East again → show *three* choices: two Paths + one Forest
-		"entry": ["N", "S"],
-		"paths": [
-			#"res://rooms/room_path2.tscn",
-			#"res://rooms/room_path3.tscn",
-			"res://rooms/tutorial_forest.tscn",
-			"res://rooms/tutorial_forest.tscn",
-			"res://rooms/tutorial_forest.tscn"
-		],
-		# If Forest is chosen, we’ll inject a BOOK pickup in that placed forest room.
-		# (We don’t know coord at draft time; we’ll attach on pick.)
-	}
-	
 ]
 
-	
 # ---------------- Room Definitions ----------------
-# Keys:
-#   path:String, name:String, tags:Array, type:String (optional but useful for filters)
-#   exits: {"N":bool,"E":bool,"S":bool,"W":bool}
-#   entry_open: same shape as exits (actual walkable opening on center of that edge)
-#   allowed_entry:Array (optional)  -> design rule
-#   blocked_entry:Array (optional)  -> design rule
-#   weight:int (>=1), unique:bool
-#
-# IMPORTANT: Set entry_open to match your TileMap collision (center edge tile).
 var ROOM_DEFS := [
 	{
 		"path": "res://rooms/room_start.tscn",
@@ -162,7 +153,6 @@ var ROOM_DEFS := [
 		"entry_open": {"N": false, "E": true, "S": false, "W": true},
 		"weight": 4,
 		"unique": true,
-		# NEW: pickups
 		"pickups": [
 			{"x": 2, "y": 4, "item_id": "book", "amount": 1, "uid": "book", "auto": false}],
 		"draftable": false
@@ -192,6 +182,28 @@ var ROOM_DEFS := [
 		"draftable": true
 	},
 	{
+		"path": "res://rooms/tutorial_path1.tscn",
+		"name": "Path1",
+		"type": "land",
+		"tags": ["path", "tutorial"],
+		"exits":      {"N": true, "E": true, "S": true, "W": false},
+		"entry_open": {"N": true, "E": true, "S": true, "W": false},
+		"weight": 4,
+		"unique": false,
+		"draftable": true
+	},
+	{
+		"path": "res://rooms/tutorial_dead_end.tscn",
+		"name": "Forest?",
+		"type": "land",
+		"tags": ["path", "tutorial"],
+		"exits":      {"N": true, "E": true, "S": true, "W": true},
+		"entry_open": {"N": true, "E": true, "S": true, "W": true},
+		"weight": 4,
+		"unique": false,
+		"draftable": true
+	},
+	{
 		"path": "res://rooms/tutorial_girl_path.tscn",
 		"name": "Path",
 		"type": "land",
@@ -204,7 +216,7 @@ var ROOM_DEFS := [
 	},
 	{
 		"path": "res://rooms/tutorial_forest.tscn",
-		"name": "Forest?",
+		"name": "Forest!",
 		"type": "land",
 		"tags": ["forest", "tutorial"],
 		"exits":      {"N": true, "E": false, "S": true, "W": false},
@@ -214,6 +226,32 @@ var ROOM_DEFS := [
 			{"x": 4, "y": 4, "item_id": "book", "amount": 1, "uid": "book", "auto": false}],
 		"unique": true,
 		"draftable": true
+	},
+	{
+		"path": "res://rooms/tutorial_hut.tscn",
+		"name": "Hut",
+		"type": "lake",
+		"tags": ["land","water"],
+		"exits":      {"N": false, "E": true, "S": false, "W": true},
+		"entry_open": {"N": false, "E": true, "S": false, "W": true},
+		"weight": 2,
+		"unique": true,
+		"npcs": [
+			{
+				"sprite": "res://npc/fisherman.png",
+				"tile": Vector2i(4, 4),
+				"lines": ["Hello."],
+				"need": {
+					"item_id": "shrimp",
+					"amount": 1,
+					"uid": "fisherman_shrimp_01",
+					"lines_before": ["Do you have a shrimp?"],
+					"lines_on_give": ["Perfect bait—thanks!"],
+					"lines_after": ["Back to the lake!"],
+					"reward": {"item_id": "book", "amount": 1}
+				}
+			}
+		]
 	},
 	{
 		"path": "res://rooms/room_start2.tscn",
@@ -255,8 +293,8 @@ var ROOM_DEFS := [
 		"entry_open": {"N": true, "E": true, "S": true, "W": true},
 		"weight": 4,
 		"pickups": [
-		{"x": 4, "y": 4, "item_id": "shrimp", "amount": 1, "uid": "shrimp"}
-	],
+			{"x": 4, "y": 4, "item_id": "shrimp", "amount": 1, "uid": "shrimp"}
+		],
 		"unique": true
 	},
 	{
@@ -329,24 +367,21 @@ var ROOM_DEFS := [
 		"weight": 2,
 		"unique": true,
 		"npcs": [
-		{
-			"sprite": "res://npc/girl.png",
-			"tile": Vector2i(4, 3),
-			# Optional default lines if nothing special
-			"lines": ["Hi!"],
-			# NEW: the trade/need
-			"need": {
-				"item_id": "book",
-				"amount": 1,
-				"uid": "girl_book_01",  # unique per run/quest
-				"lines_before": ["Have you seen my book?"],
-				"lines_on_give": ["Oh! You found it—thank you! Take this shrimp as a reward. My dad will tell you more about it."],
-				"lines_after": ["I'm busy reading now!"],
-				# optional reward:
-				"reward": {"item_id": "shrimp", "amount": 1}
+			{
+				"sprite": "res://npc/girl.png",
+				"tile": Vector2i(4, 3),
+				"lines": ["Hi!"],
+				"need": {
+					"item_id": "book",
+					"amount": 1,
+					"uid": "girl_book_01",
+					"lines_before": ["Have you seen my book?"],
+					"lines_on_give": ["Oh! You found it—thank you! Take this shrimp as a reward. My dad will tell you more about it."],
+					"lines_after": ["I'm busy reading now!"],
+					"reward": {"item_id": "shrimp", "amount": 1}
+				}
 			}
-		}
-	]
+		]
 	},
 	{
 		"path": "res://rooms/room_lake.tscn",
@@ -359,33 +394,31 @@ var ROOM_DEFS := [
 		"unique": true
 	},
 	{
-	"path": "res://rooms/room_hut.tscn",
-	"name": "Hut",
-	"type": "lake",
-	"tags": ["land","water"],
-	"exits":      {"N": false, "E": true, "S": false, "W": true},
-	"entry_open": {"N": false, "E": true, "S": false, "W": true},
-	"weight": 2,
-	"unique": true,
-
-	"npcs": [
-		{
-			"sprite": "res://npc/fisherman.png",
-			"tile": Vector2i(4, 4),
-			"lines": ["Hello."],
-			"need": {
-				"item_id": "shrimp",
-				"amount": 1,
-				"uid": "fisherman_shrimp_01",   # << unique for this quest
-				"lines_before": ["Do you have a shrimp?"],
-				"lines_on_give": ["Perfect bait—thanks!"],
-				"lines_after": ["Back to the lake!"],
-				"reward": {"item_id": "book", "amount": 1}
+		"path": "res://rooms/room_hut.tscn",
+		"name": "Hut",
+		"type": "lake",
+		"tags": ["land","water"],
+		"exits":      {"N": false, "E": true, "S": false, "W": true},
+		"entry_open": {"N": false, "E": true, "S": false, "W": true},
+		"weight": 2,
+		"unique": true,
+		"npcs": [
+			{
+				"sprite": "res://npc/fisherman.png",
+				"tile": Vector2i(4, 4),
+				"lines": ["Hello."],
+				"need": {
+					"item_id": "shrimp",
+					"amount": 1,
+					"uid": "fisherman_shrimp_01",
+					"lines_before": ["Do you have a shrimp?"],
+					"lines_on_give": ["Perfect bait—thanks!"],
+					"lines_after": ["Back to the lake!"],
+					"reward": {"item_id": "book", "amount": 1}
+				}
 			}
-		}
-	]
-}
-,
+		]
+	},
 	{
 		"path": "res://rooms/room_witch3.tscn",
 		"name": "Witch",
@@ -393,7 +426,7 @@ var ROOM_DEFS := [
 		"tags": ["land","npc"],
 		"exits":      {"N": false, "E": false, "S": true, "W": false},
 		"entry_open": {"N": false, "E": false, "S": true, "W": false},
-		"weight": 2, 
+		"weight": 2,
 		"unique": true
 	},
 	{
@@ -403,7 +436,7 @@ var ROOM_DEFS := [
 		"tags": ["land","npc"],
 		"exits":      {"N": true, "E": false, "S": false, "W": true},
 		"entry_open": {"N": true, "E": false, "S": false, "W": true},
-		"weight": 2, 
+		"weight": 2,
 		"unique": true
 	},
 	{
@@ -413,7 +446,7 @@ var ROOM_DEFS := [
 		"tags": ["land"],
 		"exits":      {"N": true, "E": false, "S": false, "W": true},
 		"entry_open": {"N": true, "E": false, "S": false, "W": true},
-		"weight": 2, 
+		"weight": 2,
 		"unique": true
 	},
 	{
@@ -423,7 +456,7 @@ var ROOM_DEFS := [
 		"tags": ["land","chest"],
 		"exits":      {"N": false, "E": true, "S": false, "W": false},
 		"entry_open": {"N": false, "E": true, "S": false, "W": false},
-		"weight": 2, 
+		"weight": 2,
 		"unique": true
 	},
 	{
@@ -435,13 +468,8 @@ var ROOM_DEFS := [
 		"entry_open": {"N": true, "E": true, "S": true, "W": true},
 		"weight": 2,
 		"chests": [
-				{
-				  "tile": Vector2i(4, 1),      # tile coordinates, 0–8 in a 9×9 room
-				  "item_id": "shrimp",         # must match your ItemDb id
-				  "amount": 1,
-				  "uid": "hut_chest_1"         # unique ID so it stays open once opened
-				}
-	 			 ],
+			{ "tile": Vector2i(4, 1), "item_id": "shrimp", "amount": 1, "uid": "hut_chest_1" }
+		],
 		"unique": true
 	},
 	{
@@ -496,19 +524,56 @@ func _get_room_pool_paths() -> Array:
 	return a
 
 func _ready() -> void:
+	# Tutorial boot
 	start_tutorial()
-	#new_run()
+
+	# Example: Per-room (path) curated rules that always apply when you're IN this room.
+	# Keys are TARGET ENTRY SIDES. Moving NORTH from the girl room means target entry "S".
+	# Moving SOUTH from the girl room means target entry "N".
+	set_draft_rules_for_room(
+		"res://rooms/tutorial_girl_path.tscn",
+		{
+			"S": [ "res://rooms/tutorial_forest.tscn"], # going NORTH
+			"N": [ "res://rooms/tutorial_path1.tscn", "res://rooms/tutorial_forest.tscn" ]  # going SOUTH
+		},
+		
+		
+	)
+	set_draft_rules_for_room(
+		"res://rooms/tutorial_forest.tscn",
+		{
+			"S": [ "res://rooms/tutorial_dead_end.tscn"], # going NORTH
+			"N": [ "res://rooms/tutorial_path1.tscn"]  # going SOUTH
+		},
+		
+		
+	)
+	
+	set_draft_rules_for_room(
+		"res://rooms/tutorial_path1.tscn",
+		{
+			"S": [ "res://rooms/tutorial_dead_end.tscn"], # going NORTH
+			"N": [ "res://rooms/tutorial_dead_end.tscn"],
+			"W": [ "res://rooms/tutorial_hut.tscn"]  # going EAST
+		},
+		
+		
+	)
+	# If you also want a one-off per-origin rule, call:
+	# set_draft_rules_for_current_origin({ "N":[...], "S":[...] })
 
 func new_run() -> void:
 	seed = int(Time.get_unix_time_from_system())
 	rng.seed = seed
 	steps_left = START_STEPS
 	visited.clear()
-	pos = START_POS            # <-- start in the middle of 8x8
+	pos = START_POS
 	used_unique.clear()
 	_npc_trades.clear()
 	_npc_need_intro.clear()
 	tutorial_overrides.clear()
+	_picked_items.clear()
+	_draft_rules_by_origin.clear()
 
 # ---------------- Public API ----------------
 
@@ -531,7 +596,7 @@ func pick_room_candidates(entry_side: String, count: int) -> Array:
 			draftable = bool(d["draftable"])
 
 		# 1) Exclude start room (by path, tag, or explicit flag)
-		if path == START_ROOM_PATH:
+		if path == start_room_path:
 			continue
 		if tags.has("start"):
 			continue
@@ -782,25 +847,47 @@ func exit_access_map(coord: Vector2i) -> Dictionary:
 		"W": exit_is_accessible(coord, "W"),
 	}
 
-# In res://autoload/RunState.gd (near your chest vars)
+# Picked items
 var _picked_items := {}
 func was_item_picked(uid: String) -> bool: return bool(_picked_items.get(uid, false))
 func mark_item_picked(uid: String) -> void: _picked_items[uid] = true
 
+# ---------- Tutorial picker (with persistent curated rules) ----------
+
+func _defs_from_paths(arr: Array) -> Array:
+	var out: Array = []
+	for p in arr:
+		var d := get_def_by_path(String(p))
+		if d.size() > 0:
+			out.append(d)
+	return out
 
 func pick_room_candidates_for_tutorial(entry_side: String, coord: Vector2i, count: int) -> Array:
+	# 0) First honor any per-origin curated rules (stickiness for this exact tile)
+	if _draft_rules_by_origin.has(pos):
+		var rules: Dictionary = _draft_rules_by_origin[pos]
+		if rules.has(entry_side):
+			return _defs_from_paths(rules[entry_side])
+
+	# 0.5) Then honor any per-room curated rules (applies whenever the current room path matches)
+	var cur_path := String(visited.get(pos, ""))
+	if cur_path != "" and curated_drafts_by_path.has(cur_path):
+		var prules: Dictionary = curated_drafts_by_path[cur_path]
+		if prules.has(entry_side):
+			return _defs_from_paths(prules[entry_side])
+
+	# 1) Otherwise use the active tutorial step (if any)
 	if game_mode != GameMode.TUTORIAL or tutorial_step < 0 or tutorial_step >= TUTORIAL_STEPS.size():
 		return []
 
 	var step = TUTORIAL_STEPS[tutorial_step]
 
-	# Optional: restrict to a specific current room
+	# Restrict to a specific current room if provided
 	if step.has("from_path"):
-		var cur_path := String(visited.get(pos, ""))
 		if cur_path != String(step["from_path"]):
 			return []
 
-	# Allow either a single entry side or a set
+	# Handle entry side filters
 	if step.has("entry"):
 		if String(step["entry"]) != entry_side:
 			return []
@@ -809,27 +896,18 @@ func pick_room_candidates_for_tutorial(entry_side: String, coord: Vector2i, coun
 		if not allowed.has(entry_side):
 			return []
 
-	# Decide which path list to use
-	var list_paths: Array = []
+	# Direction-specific curated lists
 	if step.has("paths_by_entry") and step["paths_by_entry"] is Dictionary:
 		var m: Dictionary = step["paths_by_entry"]
 		if not m.has(entry_side):
 			return []
-		list_paths = m[entry_side]
-	else:
-		list_paths = step.get("paths", [])
+		# Persist these choices for this origin so they remain available when we return later
+		if not _draft_rules_by_origin.has(pos):
+			_draft_rules_by_origin[pos] = m.duplicate(true)
+		return _defs_from_paths(m[entry_side])
 
-	# Build defs
-	var out: Array = []
-	for p in list_paths:
-		var d := get_def_by_path(String(p))
-		if d.size() > 0:
-			out.append(d)
-
-	# Keep weighting/limit behavior consistent with your non-tutorial picker
-	# (but usually the tutorial lists are short)
-	return out
-
+	# Generic list
+	return _defs_from_paths(step.get("paths", []))
 
 # Called from ScreenManager after the player chooses a draft option
 func notify_room_picked(coord: Vector2i, path: String) -> void:
@@ -841,21 +919,13 @@ func notify_room_picked(coord: Vector2i, path: String) -> void:
 	if step.has("overrides"):
 		tutorial_overrides[coord] = step["overrides"]
 
-	# Special: if this step offered the forest, and the player picked a forest,
-	# inject the BOOK pickup into THAT forest's overrides.
-	if tutorial_step == 3 and get_def_by_path(path).get("type","") == "forest":
-		tutorial_overrides[coord] = {
-			"pickups": [ { "tile": Vector2i(4,4), "item_id":"book", "amount":1, "uid":"tut_book_01" } ]
-		}
-
 	# Advance to next scripted beat
 	tutorial_step += 1
 	if tutorial_step >= TUTORIAL_STEPS.size():
-		# From now on you’re in free play, but the story continues (girl trade, hut talk, etc.)
 		end_tutorial()
 
 # When spawners ask for the room def, merge in per-tile overrides (NPCs/pickups) if any.
-# --- 3) Always merge overrides for a placed coord, even in FREE mode ---
+# Always merge overrides for a placed coord (even in FREE mode).
 func get_def_for_spawn(path: String, coord: Vector2i) -> Dictionary:
 	var base := get_def_by_path(path).duplicate(true)
 	if tutorial_overrides.has(coord):
@@ -865,25 +935,21 @@ func get_def_for_spawn(path: String, coord: Vector2i) -> Dictionary:
 				base[k] = ov[k]
 	return base
 
-
 func on_item_picked(uid: String) -> void:
 	if game_mode != GameMode.TUTORIAL: return
 	if uid == "tut_map_01" and tutorial_step < 2:
-		# Player got the map; next beat is the village intro
 		tutorial_step = 2
 
 func on_npc_first_talk(uid: String) -> void:
 	if game_mode != GameMode.TUTORIAL: return
 	if uid == "tut_girl_intro" and tutorial_step < 3:
-		# We showed the girl's “please help” lines once
 		tutorial_step = 3
 
 func on_trade_done(uid: String) -> void:
 	if game_mode != GameMode.TUTORIAL: return
 	if uid == "tut_girl_book":
-		# After giving the book, we’ll look for the fisherman
-		# When the fisherman talks, we’ll set a map marker (see NPC hook below)
+		# hook for later beats
 		pass
 
 func set_tutorial_hint_top_left() -> void:
-	tutorial_hint_point = Vector2i(0, 0)    # mark top-left
+	tutorial_hint_point = Vector2i(0, 0)
