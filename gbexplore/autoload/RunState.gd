@@ -240,16 +240,20 @@ var ROOM_DEFS := [
 			{
 				"sprite": "res://npc/fisherman.png",
 				"tile": Vector2i(4, 4),
-				"lines": ["Hello."],
+				"lines": [
+					"Are you new here?"
+				],
 				"need": {
-					"item_id": "shrimp",
-					"amount": 1,
-					"uid": "fisherman_shrimp_01",
-					"lines_before": ["Do you have a shrimp?"],
-					"lines_on_give": ["Perfect bait—thanks!"],
-					"lines_after": ["Back to the lake!"],
-					"reward": {"item_id": "book", "amount": 1}
-				}
+					"item_id":"map", "amount":1, "uid":"tut_fisherman_book",
+					"lines_on_give":[
+						"Where did you find that map?!?!",
+						"I've never seen anything like it.",
+						"LOOK!!!",
+						"There's a marked spot here! Could that be the location of the Hidden Tower?!",
+						"You should go check it out!"
+					],
+					"lines_after":[ "Go find the Hidden Tower!" ]
+				},
 			}
 		]
 	},
