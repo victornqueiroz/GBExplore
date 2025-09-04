@@ -67,6 +67,7 @@ func start_tutorial() -> void:
 	tutorial_hint_point = Vector2i(-1, -1)
 	_draft_rules_by_origin.clear()
 	print("[TUT] started")
+	call_deferred("_update_steps_ui")  # hide steps label
 
 func end_tutorial() -> void:
 	game_mode = GameMode.FREE
@@ -75,6 +76,7 @@ func end_tutorial() -> void:
 	start_room_path = START_ROOM_PATH
 	# Keep origin rules if you want curated pools to persist beyond the tutorial.
 	# _draft_rules_by_origin.clear()
+	call_deferred("_update_steps_ui")  # show steps label again
 
 # Tutorial beats
 var TUTORIAL_STEPS := [
@@ -243,6 +245,7 @@ var ROOM_DEFS := [
 				"lines": [
 					"Are you new here?"
 				],
+				"talk_uid": "tut_fisher_intro",
 				"need": {
 					"item_id":"map", "amount":1, "uid":"tut_fisherman_book",
 					"lines_on_give":[
@@ -925,7 +928,9 @@ func notify_room_picked(coord: Vector2i, path: String) -> void:
 
 	# Advance to next scripted beat
 	tutorial_step += 1
-	if tutorial_step >= TUTORIAL_STEPS.size():
+	
+	if tutorial_step >= 6:
+	#if tutorial_step >= TUTORIAL_STEPS.size():
 		end_tutorial()
 
 # When spawners ask for the room def, merge in per-tile overrides (NPCs/pickups) if any.
@@ -940,20 +945,54 @@ func get_def_for_spawn(path: String, coord: Vector2i) -> Dictionary:
 	return base
 
 func on_item_picked(uid: String) -> void:
-	if game_mode != GameMode.TUTORIAL: return
+	if game_mode != GameMode.TUTORIAL:
+		return
+	print("[TUT] on_item_picked uid=", uid)
 	if uid == "tut_map_01" and tutorial_step < 2:
 		tutorial_step = 2
 
 func on_npc_first_talk(uid: String) -> void:
-	if game_mode != GameMode.TUTORIAL: return
+	# Keep the girl beat as-is
 	if uid == "tut_girl_intro" and tutorial_step < 3:
 		tutorial_step = 3
 
+	# Hut intro → set steps to 1 only if we're really in tutorial_hut
+	if uid == "tut_fisher_intro" and _in_tutorial_hut():
+		steps_left = 1
+		print("[TUT] Fisherman talked — steps set to 1")
+		_update_steps_ui()
+
 func on_trade_done(uid: String) -> void:
-	if game_mode != GameMode.TUTORIAL: return
-	if uid == "tut_girl_book":
-		# hook for later beats
-		pass
+	# Fisherman trade → set steps to 1 only if we're really in tutorial_hut
+	if uid == "tut_fisherman_book" and _in_tutorial_hut():
+		steps_left = 1
+		print("[TUT] Fisherman trade done — steps set to 1")
+		_update_steps_ui()
+		#start_room_path = START_ROOM_PATH
+		#tutorial_step = 6
+		#end_tutorial()
 
 func set_tutorial_hint_top_left() -> void:
 	tutorial_hint_point = Vector2i(0, 0)
+
+func _in_tutorial_hut() -> bool:
+	var cur_path := String(visited.get(pos, ""))
+	return cur_path == "res://rooms/tutorial_hut.tscn"
+
+func _steps_hud() -> CanvasItem:
+	return get_node_or_null("/root/Main/UI/StepsHUD") as CanvasItem
+
+func _steps_label() -> Label:
+	return get_node_or_null("/root/Main/UI/StepsHUD/StepsLabel") as Label
+
+func _update_steps_ui() -> void:
+	var hud := _steps_hud()
+	if hud == null:
+		return
+	if game_mode == GameMode.TUTORIAL:
+		hud.visible = false     # hide entire widget during tutorial
+	else:
+		hud.visible = true
+		var lbl := _steps_label()
+		if lbl:
+			lbl.text = "STEPS: %d" % steps_left

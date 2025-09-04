@@ -8,8 +8,7 @@ class_name NPC
 @export var collider_size: Vector2 = Vector2(12, 12)
 @export var z_index_sprite: int = 2
 
-# Optional: a general “intro” gate (not tied to trade). If set, we’ll show
-# dialog_lines once before any trade logic.
+# Optional: a general “intro” gate (not tied to trade).
 @export var talk_uid: String = ""
 @export var show_intro_first: bool = true
 
@@ -38,6 +37,10 @@ class_name NPC
 # ---- Nodes ----
 @onready var spr: Sprite2D = $Sprite2D
 @onready var col: CollisionShape2D = $CollisionShape2D
+
+# ---- Tutorial hook guards (avoid double-firing) ----
+var _sent_first_talk := false
+var _reported_trade  := false
 
 func _ready() -> void:
 	add_to_group("npc")
@@ -71,7 +74,6 @@ func get_dialog_lines() -> PackedStringArray:
 		if not rs.call("was_need_intro", talk_uid):
 			if rs.has_method("mark_need_intro"):
 				rs.call("mark_need_intro", talk_uid)
-			# Prefer dialog_lines for intro; fall back to lines_before.
 			return _choose_nonempty(dialog_lines, _choose_nonempty(lines_before, ["Hello."]))
 
 	# 1) If no trade is configured → plain dialogue
@@ -86,7 +88,6 @@ func get_dialog_lines() -> PackedStringArray:
 	if intro_once and rs and rs.has_method("was_need_intro") and not rs.call("was_need_intro", trade_uid):
 		if rs.has_method("mark_need_intro"):
 			rs.call("mark_need_intro", trade_uid)
-		# Prefer lines_before (quest hint), fallback to default lines.
 		return _choose_nonempty(lines_before, _choose_nonempty(dialog_lines, ["Hello."]))
 
 	# 4) Check inventories for required item
@@ -112,6 +113,13 @@ func get_dialog_lines() -> PackedStringArray:
 		if rs and rs.has_method("mark_trade_done"):
 			rs.call("mark_trade_done", trade_uid)
 
+		# === Tutorial hook: only in res://rooms/tutorial_hut.tscn ===
+		if rs and _is_in_tutorial_hut(rs) and not _reported_trade:
+			_reported_trade = true
+			if rs.has_method("on_trade_done"):
+				print("[NPC] Trade resolved: %s (tutorial hut)" % trade_uid)
+				rs.call("on_trade_done", trade_uid)
+
 		_refresh_map_hud()
 		return _choose_nonempty(lines_on_give, ["(They take your %s.)" % required_item_id])
 
@@ -123,13 +131,31 @@ func _on_interact() -> void:
 	var face: Texture2D = portrait_face
 	if face == null:
 		face = load("res://npc/girl-portrait.png") as Texture2D
+
+	# === Tutorial hook for FIRST TALK (fires on real interaction) ===
+	var rs: Node = get_node_or_null("/root/RunState")
+	if talk_uid != "" and rs and _is_in_tutorial_hut(rs) and not _sent_first_talk:
+		_sent_first_talk = true
+		if rs.has_method("on_npc_first_talk"):
+			print("[NPC] First talk: %s (tutorial hut)" % talk_uid)
+			rs.call("on_npc_first_talk", talk_uid)
+
 	var dlg: Node = get_node_or_null("/root/Main/UI/DialogueBox")
 	if dlg == null:
 		push_warning("[NPC] DialogueBox not found at /root/Main/UI/DialogueBox")
 		return
 	dlg.call("open", get_dialog_lines(), face, "left")
 
-# ------------- helpers -------------
+# ---------- helpers ----------
+func _is_in_tutorial_hut(rs: Node) -> bool:
+	# Peek current room from RunState.visited[RunState.pos]
+	if rs == null: return false
+	var visited = rs.get("visited")
+	var pos = rs.get("pos")
+	if typeof(visited) != TYPE_DICTIONARY: return false
+	var cur_path := String(visited.get(pos, ""))
+	return cur_path == "res://rooms/tutorial_hut.tscn"
+
 func _choose_nonempty(primary: PackedStringArray, fallback: PackedStringArray) -> PackedStringArray:
 	return primary if primary.size() > 0 else fallback
 
@@ -151,7 +177,6 @@ func _inv_count(inv: Node, id: String) -> int:
 	if inv.has_method("get_count"):   return int(inv.call("get_count", id))
 	if inv.has_method("quantity_of"): return int(inv.call("quantity_of", id))
 	if inv.has_method("qty_of"):      return int(inv.call("qty_of", id))
-	# As a last resort (dictionary-like stores)
 	var dict_candidates: Array[String] = ["items","counts","store","bag","inventory","_items","_counts"]
 	for k in dict_candidates:
 		var dv: Variant = inv.get(k)
@@ -165,7 +190,6 @@ func _inv_remove(inv: Node, id: String, amt: int) -> void:
 	amt = max(1, amt)
 	var before: int = _inv_count(inv, id)
 
-	# Try common APIs
 	if inv.has_method("remove"):
 		inv.call("remove", id, amt)
 	elif inv.has_method("take"):
@@ -175,9 +199,8 @@ func _inv_remove(inv: Node, id: String, amt: int) -> void:
 	elif inv.has_method("remove_item"):
 		inv.call("remove_item", id, amt)
 	elif inv.has_method("add"):
-		inv.call("add", id, -amt)  # some inventories accept negatives
+		inv.call("add", id, -amt)
 
-	# Verify; if unchanged, patch common dictionary stores
 	var after: int = _inv_count(inv, id)
 	if after == before:
 		_dict_decrement(inv, id, amt)
