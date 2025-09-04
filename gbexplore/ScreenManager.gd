@@ -60,6 +60,7 @@ const GAME_OVER_FADE_IN: float = 0.9
 @onready var map_overlay: Control = $MapOverlay/MapRoot
 @onready var dialog_box: Control = $UI/DialogueBox
 
+
 # ----- State -----
 var pending_dir := Vector2i.ZERO
 var candidate_defs: Array = []
@@ -80,7 +81,10 @@ func _ready() -> void:
 	# make sure the fade overlay starts fully transparent
 	_fade_reset_to_clear()
 	
-	RunState.start_tutorial()
+	#RunState.start_tutorial()
+# 	NEW: react to step logic centrally
+	RunState.steps_depleted.connect(_on_steps_depleted)
+	RunState.steps_changed.connect(func(_v): _update_hud())
 
 	_load_room_at(RunState.pos, RunState.start_room_path)
 	player.position = Vector2(SCREEN_SIZE.x / 2.0 + 16, SCREEN_SIZE.y / 2.0)
@@ -89,7 +93,6 @@ func _ready() -> void:
 
 	for i in range(option_buttons.size()):
 		option_buttons[i].pressed.connect(_on_option_pressed.bind(i))
-
 func _physics_process(_delta: float) -> void:
 	if choice_panel.visible:
 		return
@@ -320,10 +323,9 @@ func _do_room_swap(next_coord: Vector2i, path: String) -> void:
 	if choice_panel.visible:
 		_close_choice_panel()
 
-	RunState.steps_left -= 1
-	_update_hud()
-	if RunState.steps_left <= 0:
-		_game_over()
+	RunState.spend_step(1)   # emits signals and triggers depletion flow
+	# _update_hud() will also run via steps_changed signal
+
 
 	if map_overlay and map_overlay.visible:
 		map_overlay.refresh()
@@ -1042,3 +1044,60 @@ func _fade_reset_to_clear() -> void:
 	if is_instance_valid(fade_black):
 		var c := fade_black.color
 		fade_black.color = Color(c.r, c.g, c.b, 0.0)	# start fully transparent
+
+
+func _on_steps_depleted() -> void:
+	if _game_over_running:
+		return
+	_game_over_running = true
+	is_transitioning = true
+
+	# 1) Run the quake and WAIT for it to finish
+	await _shake_world(GAME_OVER_SHAKE_DUR, GAME_OVER_SHAKE_MAG)
+
+	# 2) If we were in the tutorial, end it **after** the shake
+	if RunState.game_mode == RunState.GameMode.TUTORIAL:
+		RunState.end_tutorial()
+
+	# 3) Fade → reset → fade back in (no extra shake here)
+	await _fade_reset_and_reload()
+
+	_game_over_running = false
+
+func _fade_reset_and_reload() -> void:
+	_fade_reset_to_clear()
+	if is_instance_valid(fade_layer):
+		var done := false
+		fade_layer.fade_through_black(
+			GAME_OVER_FADE_OUT,   # ~3s fade to black
+			GAME_OVER_FADE_IN,    # quick fade-in after reset
+			func() -> void:
+				if "set_input_enabled" in player:
+					player.set_input_enabled(false)
+
+				RunState.new_run()
+				_clear_room()
+				_load_room_at(RunState.pos, RunState.start_room_path)
+				player.position = Vector2(SCREEN_SIZE.x / 2.0 + 32, SCREEN_SIZE.y / 2.0 - 10)
+				_update_hud()
+				emit_signal("map_state_changed")
+
+				is_transitioning = false
+
+				if "set_input_enabled" in player:
+					player.set_input_enabled(true)
+
+				done = true
+		)
+		# wait until fade_through_black's callback flips `done`
+		while not done:
+			await get_tree().process_frame
+	else:
+		# Fallback if no FadeLayer
+		RunState.new_run()
+		_clear_room()
+		_load_room_at(RunState.pos, RunState.start_room_path)
+		player.position = Vector2(SCREEN_SIZE.x / 2.0, SCREEN_SIZE.y / 2.0)
+		_update_hud()
+		emit_signal("map_state_changed")
+		is_transitioning = false

@@ -50,6 +50,11 @@ var _npc_need_intro := {}  # uid -> true
 func was_need_intro(uid: String) -> bool: return bool(_npc_need_intro.get(uid, false))
 func mark_need_intro(uid: String) -> void: _npc_need_intro[uid] = true
 
+signal steps_changed(current: int)
+signal steps_depleted
+var _depleted_emitted: bool = false
+
+
 # -------- Tutorial / Act 1 ----------
 enum GameMode { FREE, TUTORIAL }
 var game_mode: int = GameMode.FREE
@@ -253,9 +258,9 @@ var ROOM_DEFS := [
 						"I've never seen anything like it.",
 						"LOOK!!!",
 						"There's a marked spot here! Could that be the location of the Hidden Tower?!",
-						"You should go check it out!"
+						"You should go check it out before the ground starts shifting again!"
 					],
-					"lines_after":[ "Go find the Hidden Tower!" ]
+					"lines_after":[ "Go find the Hidden Tower quick!" ]
 				},
 			}
 		]
@@ -573,6 +578,7 @@ func new_run() -> void:
 	seed = int(Time.get_unix_time_from_system())
 	rng.seed = seed
 	steps_left = START_STEPS
+	_depleted_emitted = false
 	visited.clear()
 	pos = START_POS
 	used_unique.clear()
@@ -581,6 +587,8 @@ func new_run() -> void:
 	tutorial_overrides.clear()
 	_picked_items.clear()
 	_draft_rules_by_origin.clear()
+	emit_signal("steps_changed", steps_left) # <-- add (keeps HUDs in sync)
+	_update_steps_ui()                       # <-- keep your UI consistent
 
 # ---------------- Public API ----------------
 
@@ -959,6 +967,7 @@ func on_npc_first_talk(uid: String) -> void:
 	# Hut intro → set steps to 1 only if we're really in tutorial_hut
 	if uid == "tut_fisher_intro" and _in_tutorial_hut():
 		steps_left = 1
+		emit_signal("steps_changed", steps_left) 
 		print("[TUT] Fisherman talked — steps set to 1")
 		_update_steps_ui()
 
@@ -966,6 +975,7 @@ func on_trade_done(uid: String) -> void:
 	# Fisherman trade → set steps to 1 only if we're really in tutorial_hut
 	if uid == "tut_fisherman_book" and _in_tutorial_hut():
 		steps_left = 1
+		emit_signal("steps_changed", steps_left)
 		print("[TUT] Fisherman trade done — steps set to 1")
 		_update_steps_ui()
 		#start_room_path = START_ROOM_PATH
@@ -996,3 +1006,13 @@ func _update_steps_ui() -> void:
 		var lbl := _steps_label()
 		if lbl:
 			lbl.text = "STEPS: %d" % steps_left
+
+func spend_step(amount: int = 1) -> void:
+	if steps_left <= 0:
+		return
+	steps_left -= amount
+	emit_signal("steps_changed", steps_left)
+	_update_steps_ui()
+	if steps_left <= 0 and not _depleted_emitted:
+		_depleted_emitted = true
+		emit_signal("steps_depleted")
