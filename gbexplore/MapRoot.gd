@@ -2,7 +2,7 @@
 extends Control
 
 # Appearance
-const CELL := 12
+const CELL := 10
 const PAD := 8
 const GAP := 2
 const BG_COLOR := Color(0, 0, 0, 0.75)
@@ -28,8 +28,7 @@ const INV_GAP: int = 2
 const INV_PAD_TOP: int = 6
 const INV_BG: Color = Color(1, 1, 1, 0.90)
 
-var _min: Vector2i = Vector2i.ZERO
-var _max: Vector2i = Vector2i.ZERO
+# We used to track min/max bounds; with full 8x8 view they're no longer needed
 var _size_px: Vector2 = Vector2.ZERO
 
 # optional: read helpers (and listen for updates) from ScreenManager when available
@@ -45,6 +44,9 @@ func _ready() -> void:
 	if InventoryLoad and not InventoryLoad.changed.is_connected(_on_inventory_changed):
 		InventoryLoad.changed.connect(_on_inventory_changed)
 
+	# Pre-size once
+	refresh()
+
 func toggle() -> void:
 	visible = not visible
 	if visible:
@@ -59,29 +61,12 @@ func hide_map() -> void:
 	visible = false
 
 func refresh() -> void:
-	# compute bounds of placed rooms
-	if RunState.visited.size() == 0:
-		_min = Vector2i.ZERO
-		_max = Vector2i.ZERO
-	else:
-		var first := true
-		for coord in RunState.visited.keys():
-			var v := Vector2i(coord)
-			if first:
-				_min = v; _max = v; first = false
-			else:
-				if v.x < _min.x: _min.x = v.x
-				if v.y < _min.y: _min.y = v.y
-				if v.x > _max.x: _max.x = v.x
-				if v.y > _max.y: _max.y = v.y
-
-	var w_cells := (_max.x - _min.x + 1)
-	var h_cells := (_max.y - _min.y + 1)
+	# Fixed full 8×8 footprint (always)
 	var cell_span_x := float(CELL + GAP)
 	var cell_span_y := float(CELL + GAP)
 	_size_px = Vector2(
-		PAD * 2.0 + w_cells * cell_span_x - GAP,
-		PAD * 2.0 + h_cells * cell_span_y - GAP
+		PAD * 2.0 + WORLD_W * cell_span_x - GAP,
+		PAD * 2.0 + WORLD_H * cell_span_y - GAP
 	)
 
 	queue_redraw()
@@ -97,21 +82,21 @@ func _draw() -> void:
 	# panel background
 	draw_rect(Rect2(origin, _size_px), BG_COLOR)
 
-	# grid
-	var w_cells := (_max.x - _min.x + 1)
-	var h_cells := (_max.y - _min.y + 1)
+	# grid (always full 8x8)
 	var cell_span_x := float(CELL + GAP)
 	var cell_span_y := float(CELL + GAP)
-	for xi in range(w_cells + 1):
+	for xi in range(WORLD_W + 1):
 		var x := origin.x + PAD + xi * cell_span_x - GAP * 0.5
 		draw_line(Vector2(x, origin.y + PAD), Vector2(x, origin.y + _size_px.y - PAD), GRID_COLOR, 1.0)
-	for yi in range(h_cells + 1):
+	for yi in range(WORLD_H + 1):
 		var y := origin.y + PAD + yi * cell_span_y - GAP * 0.5
 		draw_line(Vector2(origin.x + PAD, y), Vector2(origin.x + _size_px.x - PAD, y), GRID_COLOR, 1.0)
 
-	# 1) draw room cells
+	# 1) draw room cells (only for placed rooms)
 	for coord in RunState.visited.keys():
 		var v := Vector2i(coord)
+		if not _in_bounds(v):
+			continue
 		var r := _cell_rect(origin, v, cell_span_x, cell_span_y)
 		draw_rect(r, ROOM_COLOR)
 
@@ -119,6 +104,8 @@ func _draw() -> void:
 	#    -> draw E and S to avoid double-draw
 	for coord2 in RunState.visited.keys():
 		var c := Vector2i(coord2)
+		if not _in_bounds(c):
+			continue
 		var r2 := _cell_rect(origin, c, cell_span_x, cell_span_y)
 
 		if _is_exit_open_between(c, "E"):
@@ -135,16 +122,19 @@ func _draw() -> void:
 	#    (only when neighbor is in-bounds and not yet visited)
 	for coord3 in RunState.visited.keys():
 		var v3 := Vector2i(coord3)
+		if not _in_bounds(v3):
+			continue
 		var r3 := _cell_rect(origin, v3, cell_span_x, cell_span_y)
 		_draw_open_stubs(r3, v3)
 
 	# current position
 	var cur := RunState.pos
-	var cur_cell := Vector2(
-		origin.x + PAD + (cur.x - _min.x) * cell_span_x,
-		origin.y + PAD + (cur.y - _min.y) * cell_span_y
-	)
-	draw_circle(cur_cell + Vector2(CELL, CELL) * 0.5, 2.5, CURRENT_COLOR)
+	if _in_bounds(cur):
+		var cur_cell := Vector2(
+			origin.x + PAD + cur.x * cell_span_x,
+			origin.y + PAD + cur.y * cell_span_y
+		)
+		draw_circle(cur_cell + Vector2(CELL, CELL) * 0.5, 2.5, CURRENT_COLOR)
 
 	# inventory under the map
 	_draw_inventory(origin)
@@ -154,8 +144,8 @@ func _draw() -> void:
 # -------------------------------
 func _cell_rect(origin: Vector2, v: Vector2i, span_x: float, span_y: float) -> Rect2:
 	var cell_pos := Vector2(
-		origin.x + PAD + (v.x - _min.x) * span_x,
-		origin.y + PAD + (v.y - _min.y) * span_y
+		origin.x + PAD + v.x * span_x,
+		origin.y + PAD + v.y * span_y
 	)
 	return Rect2(cell_pos, Vector2(CELL, CELL))
 
