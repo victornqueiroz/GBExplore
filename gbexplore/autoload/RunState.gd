@@ -19,6 +19,10 @@ func set_start_room_path(p: String) -> void:
 func get_start_room_path() -> String:
 	return _start_room_path_runtime
 
+# --- Destination / hint marker (e.g., Hidden Tower) ---
+var _dest_marker_enabled: bool = false
+var _dest_marker_coord: Vector2i = Vector2i(0, 0)
+
 # With an even grid, there are 4 “central” tiles; we’ll pick (4,4)
 const START_POS := Vector2i(GRID_W / 2, GRID_H / 2)   # -> (4, 4)
 
@@ -46,21 +50,20 @@ func mark_trade_done(uid: String) -> void:
 	_npc_trades[uid] = true
 
 	if uid == TUTORIAL_FISHER_TRADE_UID:
-		# 1. Set steps to 1
+		# steps → 1
 		if "set_steps" in self:
 			set_steps(1)
-
-		# 2. Make tutorial rooms non-draftable
+		# switch to normal start next time
+		set_start_room_path("res://rooms/room_start.tscn")
+		# make all tutorial rooms non-draftable (your earlier logic)
 		for d in ROOM_DEFS:
 			if typeof(d) == TYPE_DICTIONARY and d.has("path"):
 				var path := String(d["path"])
 				if path.contains("tutorial_"):
 					d["draftable"] = false
-
-		# 3. Switch start room to default non-tutorial start
-		set_start_room_path("res://rooms/room_start.tscn")
-		
-		
+		# NEW: show a destination marker at (0,0)
+		enable_destination_marker_at(Vector2i(0, 0))
+			
 # Has the NPC already explained their need this run?
 var _npc_need_intro := {}  # uid -> true
 func was_need_intro(uid: String) -> bool: return bool(_npc_need_intro.get(uid, false))
@@ -595,6 +598,7 @@ func new_run() -> void:
 	# _opened_chests.clear()
 	# _picked_items.clear()
 	_depleted_emitted = false
+	#clear_destination_marker()
 
 # ---------------- Public API ----------------
 
@@ -892,3 +896,17 @@ func exit_access_map(coord: Vector2i) -> Dictionary:
 		"S": exit_is_accessible(coord, "S"),
 		"W": exit_is_accessible(coord, "W"),
 	}
+
+
+func enable_destination_marker_at(coord: Vector2i) -> void:
+	_dest_marker_enabled = true
+	_dest_marker_coord = coord
+
+func clear_destination_marker() -> void:
+	_dest_marker_enabled = false
+
+func has_destination_marker() -> bool:
+	return _dest_marker_enabled
+
+func get_destination_marker_coord() -> Vector2i:
+	return _dest_marker_coord

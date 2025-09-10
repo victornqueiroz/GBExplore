@@ -7,6 +7,7 @@ const PAD := 8
 const GAP := 2
 const BG_COLOR := Color(0, 0, 0, 0.75)
 const ROOM_COLOR := Color(0.65, 0.85, 1.0, 0.9)
+const DEST_MARKER_COLOR := Color(0.95, 0.3, 0.35, 1.0)  # reddish, distinct from CURRENT_COLOR
 
 # Door visuals (kept for flexibility; not drawing blocked ticks anymore)
 const EXIT_OPEN_COLOR := Color(1, 1, 1, 0.95)
@@ -135,6 +136,17 @@ func _draw() -> void:
 			origin.y + PAD + cur.y * cell_span_y
 		)
 		draw_circle(cur_cell + Vector2(CELL, CELL) * 0.5, 2.5, CURRENT_COLOR)
+
+	# destination / hint marker (e.g., after tutorial trade)
+	if "has_destination_marker" in RunState and RunState.has_destination_marker():
+		var m := RunState.get_destination_marker_coord()
+		if _in_bounds(m):
+			var m_center := Vector2(
+				origin.x + PAD + m.x * cell_span_x + CELL * 0.5,
+				origin.y + PAD + m.y * cell_span_y + CELL * 0.5
+			)
+			# Slightly larger than player dot for hierarchy
+			draw_circle(m_center, 3.5, DEST_MARKER_COLOR)
 
 	# inventory under the map
 	_draw_inventory(origin)
