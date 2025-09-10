@@ -81,6 +81,7 @@ func _ready() -> void:
 	_fade_reset_to_clear()
 
 	_load_room_at(RunState.pos, "res://rooms/tutorial_start.tscn")
+	#_load_room_at(RunState.pos, "res://rooms/room_beach_special.tscn")
 	player.position = Vector2(SCREEN_SIZE.x / 2.0 + 16, SCREEN_SIZE.y / 2.0)
 	_update_hud()
 	_close_choice_panel()
@@ -362,7 +363,7 @@ func _game_over() -> void:
 
 				RunState.new_run()
 				_clear_room()
-				_load_room_at(RunState.pos, "res://rooms/tutorial_start.tscn")
+				_load_room_at(RunState.pos, RunState.get_start_room_path())
 				player.position = Vector2(SCREEN_SIZE.x / 2.0 + 32, SCREEN_SIZE.y / 2.0 - 10)
 				_update_hud()
 				emit_signal("map_state_changed")
@@ -378,7 +379,7 @@ func _game_over() -> void:
 		# Fallback if no FadeLayer
 		RunState.new_run()
 		_clear_room()
-		_load_room_at(RunState.pos, "res://rooms/tutorial_start.tscn")
+		_load_room_at(RunState.pos, RunState.get_start_room_path())
 		player.position = Vector2(SCREEN_SIZE.x / 2.0, SCREEN_SIZE.y / 2.0)
 
 		_update_hud()
@@ -762,14 +763,11 @@ func _def_exit_sides(def: Dictionary) -> Array[String]:
 	return sides
 
 func _arrow_for_side(side: String) -> String:
-	if side == "N":
-		return "↑"
-	if side == "E":
-		return "→"
-	if side == "S":
-		return "↓"
-	if side == "W":
-		return "←"
+	match side:
+		"N": return "^"
+		"E": return ">"
+		"S": return "v"
+		"W": return "<"
 	return "?"
 
 func _exit_arrows_inline(def: Dictionary, entry_side: String) -> String:
@@ -777,10 +775,10 @@ func _exit_arrows_inline(def: Dictionary, entry_side: String) -> String:
 		return ""
 	var eo: Dictionary = def["entry_open"]
 	var arrows := []
-	if eo.get("W", false) and entry_side != "W": arrows.append("←")
-	if eo.get("N", false) and entry_side != "N": arrows.append("↑")
-	if eo.get("S", false) and entry_side != "S": arrows.append("↓")
-	if eo.get("E", false) and entry_side != "E": arrows.append("→")
+	if eo.get("W", false) and entry_side != "W": arrows.append(_arrow_for_side("W"))
+	if eo.get("N", false) and entry_side != "N": arrows.append(_arrow_for_side("N"))
+	if eo.get("S", false) and entry_side != "S": arrows.append(_arrow_for_side("S"))
+	if eo.get("E", false) and entry_side != "E": arrows.append(_arrow_for_side("E"))
 	return " ".join(arrows)
 
 func _def_exit_tooltip(def: Dictionary) -> String:

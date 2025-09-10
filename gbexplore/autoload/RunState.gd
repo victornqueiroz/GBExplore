@@ -10,8 +10,20 @@ const GRID_H := 8
 
 const START_ROOM_PATH := "res://rooms/room_start.tscn"
 
+# Mutable start room (so we can switch mid-run, e.g. after the tutorial)
+var _start_room_path_runtime: String = START_ROOM_PATH
+
+func set_start_room_path(p: String) -> void:
+	_start_room_path_runtime = p
+
+func get_start_room_path() -> String:
+	return _start_room_path_runtime
+
 # With an even grid, there are 4 “central” tiles; we’ll pick (4,4)
 const START_POS := Vector2i(GRID_W / 2, GRID_H / 2)   # -> (4, 4)
+
+# The trade UID in tutorial_hut that should force steps to 1 after trade completes
+const TUTORIAL_FISHER_TRADE_UID := "tut_fisherman_book"
 
 # ---------------- State ----------------
 var rng := RandomNumberGenerator.new()
@@ -29,8 +41,26 @@ var _opened_chests := {}  # uid -> true
 # Track completed NPC trades (one-time interactions)
 var _npc_trades := {}  # uid -> true
 func was_trade_done(uid: String) -> bool: return bool(_npc_trades.get(uid, false))
-func mark_trade_done(uid: String) -> void: _npc_trades[uid] = true
 
+func mark_trade_done(uid: String) -> void:
+	_npc_trades[uid] = true
+
+	if uid == TUTORIAL_FISHER_TRADE_UID:
+		# 1. Set steps to 1
+		if "set_steps" in self:
+			set_steps(1)
+
+		# 2. Make tutorial rooms non-draftable
+		for d in ROOM_DEFS:
+			if typeof(d) == TYPE_DICTIONARY and d.has("path"):
+				var path := String(d["path"])
+				if path.contains("tutorial_"):
+					d["draftable"] = false
+
+		# 3. Switch start room to default non-tutorial start
+		set_start_room_path("res://rooms/room_start.tscn")
+		
+		
 # Has the NPC already explained their need this run?
 var _npc_need_intro := {}  # uid -> true
 func was_need_intro(uid: String) -> bool: return bool(_npc_need_intro.get(uid, false))
@@ -83,6 +113,14 @@ func spend_step(n: int) -> void:
 		_depleted_emitted = true
 		emit_signal("steps_depleted")
 
+# NEW: safe setter used by the tutorial hut completion
+func set_steps(n: int) -> void:
+	steps_left = max(0, n)
+	emit_signal("steps_changed", steps_left)
+	if steps_left == 0 and not _depleted_emitted:
+		_depleted_emitted = true
+		emit_signal("steps_depleted")
+
 # ---------------- Room Definitions ----------------
 var ROOM_DEFS := [
 	{
@@ -94,8 +132,6 @@ var ROOM_DEFS := [
 		"entry_open": {"N": false, "E": true, "S": false, "W": true},
 		"weight": 4,
 		"unique": true,
-		"pickups": [
-			{"x": 2, "y": 4, "item_id": "book", "amount": 1, "uid": "book", "auto": false}],
 		"draftable": false
 	},
 	{
@@ -454,6 +490,18 @@ var ROOM_DEFS := [
 		"name": "Beach ★",
 		"type": "beach",
 		"tags": ["water","beach"],
+		"npcs": [
+			{
+				"sprite": "res://npc/mermaid.png",
+				"tile": Vector2i(5, 5),
+				"lines": [
+					"嗨，陌生人！",
+					"我要返屋企，但我唔識游水。",
+					"如果我有一條魔鬼魚，我就可以騎住佢⋯"
+				],
+				
+			}
+		],
 		"exits":        {"N": true, "E": true, "S": false, "W": true},
 		"entry_open":   {"N": true, "E": true, "S": false, "W": true},
 		"weight": 3,
@@ -498,8 +546,6 @@ func _ready() -> void:
 		{
 			"W": [ "res://rooms/tutorial_path.tscn"]
 		},
-		
-		
 	)
 	
 	set_draft_rules_for_room(
@@ -507,8 +553,6 @@ func _ready() -> void:
 		{
 			"W": [ "res://rooms/tutorial_girl_path.tscn"]
 		},
-		
-		
 	)
 	
 	set_draft_rules_for_room(
@@ -517,8 +561,6 @@ func _ready() -> void:
 			"S": [ "res://rooms/tutorial_forest.tscn"], # going NORTH
 			"N": [ "res://rooms/tutorial_path1.tscn", "res://rooms/tutorial_forest.tscn" ]  # going SOUTH
 		},
-		
-		
 	)
 	set_draft_rules_for_room(
 		"res://rooms/tutorial_forest.tscn",
@@ -526,8 +568,6 @@ func _ready() -> void:
 			"S": [ "res://rooms/tutorial_dead_end.tscn"], # going NORTH
 			"N": [ "res://rooms/tutorial_path1.tscn"]  # going SOUTH
 		},
-		
-		
 	)
 	
 	set_draft_rules_for_room(
@@ -537,8 +577,6 @@ func _ready() -> void:
 			"N": [ "res://rooms/tutorial_dead_end.tscn"],
 			"W": [ "res://rooms/tutorial_hut.tscn"]  # going EAST
 		},
-		
-		
 	)
 	# If you also want a one-off per-origin rule, call:
 	# set_draft_rules_for_current_origin({ "N":[...], "S":[...] })
@@ -553,7 +591,10 @@ func new_run() -> void:
 	used_unique.clear()
 	_npc_trades.clear()
 	_npc_need_intro.clear()
-
+	# If you also track pickups/opened chests persistently per run, reset here as needed:
+	# _opened_chests.clear()
+	# _picked_items.clear()
+	_depleted_emitted = false
 
 # ---------------- Public API ----------------
 
