@@ -80,7 +80,7 @@ func _ready() -> void:
 	# make sure the fade overlay starts fully transparent
 	_fade_reset_to_clear()
 
-	_load_room_at(RunState.pos, "res://rooms/room_start.tscn")
+	_load_room_at(RunState.pos, "res://rooms/tutorial_start.tscn")
 	player.position = Vector2(SCREEN_SIZE.x / 2.0 + 16, SCREEN_SIZE.y / 2.0)
 	_update_hud()
 	_close_choice_panel()
@@ -362,7 +362,7 @@ func _game_over() -> void:
 
 				RunState.new_run()
 				_clear_room()
-				_load_room_at(RunState.pos, "res://rooms/room_start.tscn")
+				_load_room_at(RunState.pos, "res://rooms/tutorial_start.tscn")
 				player.position = Vector2(SCREEN_SIZE.x / 2.0 + 32, SCREEN_SIZE.y / 2.0 - 10)
 				_update_hud()
 				emit_signal("map_state_changed")
@@ -378,7 +378,7 @@ func _game_over() -> void:
 		# Fallback if no FadeLayer
 		RunState.new_run()
 		_clear_room()
-		_load_room_at(RunState.pos, "res://rooms/room_start.tscn")
+		_load_room_at(RunState.pos, "res://rooms/tutorial_start.tscn")
 		player.position = Vector2(SCREEN_SIZE.x / 2.0, SCREEN_SIZE.y / 2.0)
 
 		_update_hud()

@@ -1,6 +1,7 @@
 extends Node
 # Autoloaded as "RunState" (no class_name here)
 
+# ---------------- Config ----------------
 const START_STEPS := 30
 
 # Canonical world size (keep this in sync with ScreenManager or reference it from there)
@@ -12,6 +13,7 @@ const START_ROOM_PATH := "res://rooms/room_start.tscn"
 # With an even grid, there are 4 “central” tiles; we’ll pick (4,4)
 const START_POS := Vector2i(GRID_W / 2, GRID_H / 2)   # -> (4, 4)
 
+# ---------------- State ----------------
 var rng := RandomNumberGenerator.new()
 var seed: int = 0
 var steps_left: int = START_STEPS
@@ -34,23 +36,54 @@ var _npc_need_intro := {}  # uid -> true
 func was_need_intro(uid: String) -> bool: return bool(_npc_need_intro.get(uid, false))
 func mark_need_intro(uid: String) -> void: _npc_need_intro[uid] = true
 
+# Items picked from room "pickups"
+var _picked_items := {}
+func was_item_picked(uid: String) -> bool: return bool(_picked_items.get(uid, false))
+func mark_item_picked(uid: String) -> void: _picked_items[uid] = true
 
-func was_chest_opened(uid: String) -> bool:
-	return bool(_opened_chests.get(uid, false))
+# ---------------- Curated Draft Rules ----------------
+# Rules keyed by CURRENT room path.
+# Each ruleset can optionally specify per-side arrays:
+# { "N": [paths], "E": [paths], "S": [paths], "W": [paths], "_any": [paths] }
+var _curated_drafts_by_room: Dictionary = {}   # String (room path) -> Dictionary
 
-func mark_chest_opened(uid: String) -> void:
-	_opened_chests[uid] = true
-	
+func set_draft_rules_for_room(room_path: String, rules: Dictionary) -> void:
+	_curated_drafts_by_room[room_path] = rules.duplicate(true)
+
+func clear_draft_rules_for_room(room_path: String) -> void:
+	_curated_drafts_by_room.erase(room_path)
+
+func clear_all_draft_rules() -> void:
+	_curated_drafts_by_room.clear()
+
+func get_curated_draft_paths(current_room_path: String, exit_side: String) -> Array:
+	var rules = _curated_drafts_by_room.get(current_room_path, null)
+	if rules == null:
+		return []
+	var side_list: Array = rules.get(exit_side, [])
+	if side_list.size() > 0:
+		return side_list.duplicate(true)
+	return rules.get("_any", []).duplicate(true)
+
+func _current_room_path() -> String:
+	# Resolve the path of the room where the player currently is
+	if visited.has(pos):
+		return String(visited[pos])
+	return START_ROOM_PATH
+
+# ---------------- Step Signals (optional but safe) ----------------
+signal steps_changed(current: int)
+signal steps_depleted
+var _depleted_emitted := false
+
+func spend_step(n: int) -> void:
+	steps_left = max(steps_left - n, 0)
+	emit_signal("steps_changed", steps_left)
+	if steps_left == 0 and not _depleted_emitted:
+		_depleted_emitted = true
+		emit_signal("steps_depleted")
+
 # ---------------- Room Definitions ----------------
-# Keys:
-#   path:String, name:String, tags:Array, type:String (optional but useful for filters)
-#   exits: {"N":bool,"E":bool,"S":bool,"W":bool}
-#   entry_open: same shape as exits (actual walkable opening on center of that edge)
-#   allowed_entry:Array (optional)  -> design rule
-#   blocked_entry:Array (optional)  -> design rule
-#   weight:int (>=1), unique:bool
-#
-# IMPORTANT: Set entry_open to match your TileMap collision (center edge tile).
 var ROOM_DEFS := [
 	{
 		"path": "res://rooms/room_start.tscn",
@@ -61,10 +94,110 @@ var ROOM_DEFS := [
 		"entry_open": {"N": false, "E": true, "S": false, "W": true},
 		"weight": 4,
 		"unique": true,
-		# NEW: pickups
 		"pickups": [
 			{"x": 2, "y": 4, "item_id": "book", "amount": 1, "uid": "book", "auto": false}],
 		"draftable": false
+	},
+	{
+		"path": "res://rooms/tutorial_start.tscn",
+		"name": "Start",
+		"type": "land",
+		"tags": ["start", "tutorial"],
+		"exits":      {"N": false, "E": true, "S": false, "W": false},
+		"entry_open": {"N": false, "E": true, "S": false, "W": false},
+		"weight": 4,
+		"unique": true,
+		"draftable": false
+	},
+	{
+		"path": "res://rooms/tutorial_path.tscn",
+		"name": "???",
+		"type": "land",
+		"tags": ["path", "tutorial"],
+		"exits":      {"N": false, "E": true, "S": false, "W": true},
+		"entry_open": {"N": false, "E": true, "S": false, "W": true},
+		"weight": 4,
+		"pickups": [
+			{"x": 4, "y": 4, "item_id": "map", "amount": 1, "uid": "map", "auto": false}],
+		"unique": true,
+		"draftable": true
+	},
+	{
+		"path": "res://rooms/tutorial_path1.tscn",
+		"name": "Path1",
+		"type": "land",
+		"tags": ["path", "tutorial"],
+		"exits":      {"N": true, "E": true, "S": true, "W": false},
+		"entry_open": {"N": true, "E": true, "S": true, "W": false},
+		"weight": 4,
+		"unique": false,
+		"draftable": true
+	},
+	{
+		"path": "res://rooms/tutorial_dead_end.tscn",
+		"name": "Forest?",
+		"type": "land",
+		"tags": ["path", "tutorial"],
+		"exits":      {"N": true, "E": true, "S": true, "W": true},
+		"entry_open": {"N": true, "E": true, "S": true, "W": true},
+		"weight": 4,
+		"unique": false,
+		"draftable": true
+	},
+	{
+		"path": "res://rooms/tutorial_girl_path.tscn",
+		"name": "Path",
+		"type": "land",
+		"tags": ["path", "tutorial"],
+		"exits":      {"N": true, "E": false, "S": true, "W": true},
+		"entry_open": {"N": true, "E": false, "S": true, "W": true},
+		"weight": 4,
+		"unique": true,
+		"draftable": true
+	},
+	{
+		"path": "res://rooms/tutorial_forest.tscn",
+		"name": "Forest!",
+		"type": "land",
+		"tags": ["forest", "tutorial"],
+		"exits":      {"N": true, "E": false, "S": true, "W": false},
+		"entry_open": {"N": true, "E": false, "S": true, "W": false},
+		"weight": 4,
+		"pickups": [
+			{"x": 4, "y": 4, "item_id": "book", "amount": 1, "uid": "book", "auto": false}],
+		"unique": true,
+		"draftable": true
+	},
+	{
+		"path": "res://rooms/tutorial_hut.tscn",
+		"name": "Hut",
+		"type": "lake",
+		"tags": ["land","water"],
+		"exits":      {"N": false, "E": true, "S": false, "W": true},
+		"entry_open": {"N": false, "E": true, "S": false, "W": true},
+		"weight": 2,
+		"unique": true,
+		"npcs": [
+			{
+				"sprite": "res://npc/fisherman.png",
+				"tile": Vector2i(4, 4),
+				"lines": [
+					"Are you new here?"
+				],
+				"talk_uid": "tut_fisher_intro",
+				"need": {
+					"item_id":"map", "amount":1, "uid":"tut_fisherman_book",
+					"lines_on_give":[
+						"Where did you find that map?!?!",
+						"I've never seen anything like it.",
+						"LOOK!!!",
+						"There's a marked spot here! Could that be the location of the Hidden Tower?!",
+						"You should go check it out before the ground starts shifting again!"
+					],
+					"lines_after":[ "Go find the Hidden Tower quick!" ]
+				},
+			}
+		]
 	},
 	{
 		"path": "res://rooms/room_start2.tscn",
@@ -106,8 +239,8 @@ var ROOM_DEFS := [
 		"entry_open": {"N": true, "E": true, "S": true, "W": true},
 		"weight": 4,
 		"pickups": [
-		{"x": 4, "y": 4, "item_id": "shrimp", "amount": 1, "uid": "shrimp"}
-	],
+			{"x": 4, "y": 4, "item_id": "shrimp", "amount": 1, "uid": "shrimp"}
+		],
 		"unique": true
 	},
 	{
@@ -180,24 +313,21 @@ var ROOM_DEFS := [
 		"weight": 2,
 		"unique": true,
 		"npcs": [
-		{
-			"sprite": "res://npc/girl.png",
-			"tile": Vector2i(4, 3),
-			# Optional default lines if nothing special
-			"lines": ["Hi!"],
-			# NEW: the trade/need
-			"need": {
-				"item_id": "book",
-				"amount": 1,
-				"uid": "girl_book_01",  # unique per run/quest
-				"lines_before": ["Have you seen my book?"],
-				"lines_on_give": ["Oh! You found it—thank you! Take this shrimp as a reward. My dad will tell you more about it."],
-				"lines_after": ["I'm busy reading now!"],
-				# optional reward:
-				"reward": {"item_id": "shrimp", "amount": 1}
+			{
+				"sprite": "res://npc/girl.png",
+				"tile": Vector2i(4, 3),
+				"lines": ["Hi!"],
+				"need": {
+					"item_id": "book",
+					"amount": 1,
+					"uid": "girl_book_01",
+					"lines_before": ["Have you seen my book?"],
+					"lines_on_give": ["Oh! You found it—thank you! Take this shrimp as a reward. My dad will tell you more about it."],
+					"lines_after": ["I'm busy reading now!"],
+					"reward": {"item_id": "shrimp", "amount": 1}
+				}
 			}
-		}
-	]
+		]
 	},
 	{
 		"path": "res://rooms/room_lake.tscn",
@@ -210,33 +340,31 @@ var ROOM_DEFS := [
 		"unique": true
 	},
 	{
-	"path": "res://rooms/room_hut.tscn",
-	"name": "Hut",
-	"type": "lake",
-	"tags": ["land","water"],
-	"exits":      {"N": false, "E": true, "S": false, "W": true},
-	"entry_open": {"N": false, "E": true, "S": false, "W": true},
-	"weight": 2,
-	"unique": true,
-
-	"npcs": [
-		{
-			"sprite": "res://npc/fisherman.png",
-			"tile": Vector2i(4, 4),
-			"lines": ["Hello."],
-			"need": {
-				"item_id": "shrimp",
-				"amount": 1,
-				"uid": "fisherman_shrimp_01",   # << unique for this quest
-				"lines_before": ["Do you have a shrimp?"],
-				"lines_on_give": ["Perfect bait—thanks!"],
-				"lines_after": ["Back to the lake!"],
-				"reward": {"item_id": "book", "amount": 1}
+		"path": "res://rooms/room_hut.tscn",
+		"name": "Hut",
+		"type": "lake",
+		"tags": ["land","water"],
+		"exits":      {"N": false, "E": true, "S": false, "W": true},
+		"entry_open": {"N": false, "E": true, "S": false, "W": true},
+		"weight": 2,
+		"unique": true,
+		"npcs": [
+			{
+				"sprite": "res://npc/fisherman.png",
+				"tile": Vector2i(4, 4),
+				"lines": ["Hello."],
+				"need": {
+					"item_id": "shrimp",
+					"amount": 1,
+					"uid": "fisherman_shrimp_01",
+					"lines_before": ["Do you have a shrimp?"],
+					"lines_on_give": ["Perfect bait—thanks!"],
+					"lines_after": ["Back to the lake!"],
+					"reward": {"item_id": "book", "amount": 1}
+				}
 			}
-		}
-	]
-}
-,
+		]
+	},
 	{
 		"path": "res://rooms/room_witch3.tscn",
 		"name": "Witch",
@@ -244,7 +372,7 @@ var ROOM_DEFS := [
 		"tags": ["land","npc"],
 		"exits":      {"N": false, "E": false, "S": true, "W": false},
 		"entry_open": {"N": false, "E": false, "S": true, "W": false},
-		"weight": 2, 
+		"weight": 2,
 		"unique": true
 	},
 	{
@@ -254,7 +382,7 @@ var ROOM_DEFS := [
 		"tags": ["land","npc"],
 		"exits":      {"N": true, "E": false, "S": false, "W": true},
 		"entry_open": {"N": true, "E": false, "S": false, "W": true},
-		"weight": 2, 
+		"weight": 2,
 		"unique": true
 	},
 	{
@@ -264,7 +392,7 @@ var ROOM_DEFS := [
 		"tags": ["land"],
 		"exits":      {"N": true, "E": false, "S": false, "W": true},
 		"entry_open": {"N": true, "E": false, "S": false, "W": true},
-		"weight": 2, 
+		"weight": 2,
 		"unique": true
 	},
 	{
@@ -274,7 +402,7 @@ var ROOM_DEFS := [
 		"tags": ["land","chest"],
 		"exits":      {"N": false, "E": true, "S": false, "W": false},
 		"entry_open": {"N": false, "E": true, "S": false, "W": false},
-		"weight": 2, 
+		"weight": 2,
 		"unique": true
 	},
 	{
@@ -286,13 +414,8 @@ var ROOM_DEFS := [
 		"entry_open": {"N": true, "E": true, "S": true, "W": true},
 		"weight": 2,
 		"chests": [
-				{
-				  "tile": Vector2i(4, 1),      # tile coordinates, 0–8 in a 9×9 room
-				  "item_id": "shrimp",         # must match your ItemDb id
-				  "amount": 1,
-				  "uid": "hut_chest_1"         # unique ID so it stays open once opened
-				}
-	 			 ],
+			{ "tile": Vector2i(4, 1), "item_id": "shrimp", "amount": 1, "uid": "hut_chest_1" }
+		],
 		"unique": true
 	},
 	{
@@ -338,7 +461,6 @@ var ROOM_DEFS := [
 		"unique": true
 	}
 ]
-
 # Back-compat: if other code still references room_pool (paths only), keep it.
 func _get_room_pool_paths() -> Array:
 	var a: Array = []
@@ -347,6 +469,58 @@ func _get_room_pool_paths() -> Array:
 	return a
 
 func _ready() -> void:
+	# Example: Per-room (path) curated rules that always apply when you're IN this room.
+	# Keys are TARGET ENTRY SIDES. Moving NORTH from the girl room means target entry "S".
+	# Moving SOUTH from the girl room means target entry "N".
+	set_draft_rules_for_room(
+		"res://rooms/tutorial_start.tscn",
+		{
+			"W": [ "res://rooms/tutorial_path.tscn"]
+		},
+		
+		
+	)
+	
+	set_draft_rules_for_room(
+		"res://rooms/tutorial_path.tscn",
+		{
+			"W": [ "res://rooms/tutorial_girl_path.tscn"]
+		},
+		
+		
+	)
+	
+	set_draft_rules_for_room(
+		"res://rooms/tutorial_girl_path.tscn",
+		{
+			"S": [ "res://rooms/tutorial_forest.tscn"], # going NORTH
+			"N": [ "res://rooms/tutorial_path1.tscn", "res://rooms/tutorial_forest.tscn" ]  # going SOUTH
+		},
+		
+		
+	)
+	set_draft_rules_for_room(
+		"res://rooms/tutorial_forest.tscn",
+		{
+			"S": [ "res://rooms/tutorial_dead_end.tscn"], # going NORTH
+			"N": [ "res://rooms/tutorial_path1.tscn"]  # going SOUTH
+		},
+		
+		
+	)
+	
+	set_draft_rules_for_room(
+		"res://rooms/tutorial_path1.tscn",
+		{
+			"S": [ "res://rooms/tutorial_dead_end.tscn"], # going NORTH
+			"N": [ "res://rooms/tutorial_dead_end.tscn"],
+			"W": [ "res://rooms/tutorial_hut.tscn"]  # going EAST
+		},
+		
+		
+	)
+	# If you also want a one-off per-origin rule, call:
+	# set_draft_rules_for_current_origin({ "N":[...], "S":[...] })
 	new_run()
 
 func new_run() -> void:
@@ -358,6 +532,7 @@ func new_run() -> void:
 	used_unique.clear()
 	_npc_trades.clear()
 	_npc_need_intro.clear()
+
 
 # ---------------- Public API ----------------
 
@@ -399,6 +574,15 @@ func pick_room_candidates(entry_side: String, count: int) -> Array:
 
 		pool.append(d)
 
+	# --- Curated filter (by current room + side) ---
+	var cur_path := _current_room_path()
+	var curated_paths: Array = get_curated_draft_paths(cur_path, entry_side)
+	if curated_paths.size() > 0:
+		pool = pool.filter(func(d):
+			var p := String(d.get("path", ""))
+			return curated_paths.has(p)
+		)
+
 	# Shuffle deterministically per run (optional)
 	var shuffler: RandomNumberGenerator = RandomNumberGenerator.new()
 	shuffler.seed = int(seed)
@@ -422,6 +606,7 @@ func pick_room_candidates_for_coord(entry_side: String, coord: Vector2i, count: 
 			if def_compatible_with_neighbors(coord, entry_side, def):
 				eligible.append(def)
 
+	# Fallback if nothing matched strict rules
 	if eligible.size() == 0:
 		for def2 in ROOM_DEFS:
 			var p2: String = String(def2["path"])
@@ -429,6 +614,15 @@ func pick_room_candidates_for_coord(entry_side: String, coord: Vector2i, count: 
 				continue
 			if def_compatible_with_neighbors(coord, entry_side, def2):
 				eligible.append(def2)
+
+	# --- Curated filter (by current room + side) ---
+	var cur_path := _current_room_path()
+	var curated_paths: Array = get_curated_draft_paths(cur_path, entry_side)
+	if curated_paths.size() > 0:
+		eligible = eligible.filter(func(d):
+			var p := String(d.get("path", ""))
+			return curated_paths.has(p)
+		)
 
 	return _weighted_pick_without_replacement(eligible, count)
 
@@ -439,6 +633,12 @@ func mark_used_if_unique(def: Dictionary) -> void:
 		used_unique[p] = true
 
 # ---------------- Helpers ----------------
+
+func was_chest_opened(uid: String) -> bool:
+	return bool(_opened_chests.get(uid, false))
+
+func mark_chest_opened(uid: String) -> void:
+	_opened_chests[uid] = true
 
 func _is_unique_used(path: String) -> bool:
 	return used_unique.has(path)
@@ -630,13 +830,3 @@ func exit_access_map(coord: Vector2i) -> Dictionary:
 		"S": exit_is_accessible(coord, "S"),
 		"W": exit_is_accessible(coord, "W"),
 	}
-
-# In res://autoload/RunState.gd (near your chest vars)
-var _picked_items := {}
-func was_item_picked(uid: String) -> bool: return bool(_picked_items.get(uid, false))
-func mark_item_picked(uid: String) -> void: _picked_items[uid] = true
-
-
-
-# If you reset these on new runs, clear _picked_items in your reset flow,
-# just like you do for chests (if applicable).

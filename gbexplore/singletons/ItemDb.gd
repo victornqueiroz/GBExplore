@@ -6,9 +6,10 @@ var _by_id: Dictionary = {}
 func _ready() -> void:
 	var shrimp: ItemData = preload("res://items/shrimp.tres")
 	var book: ItemData = preload("res://items/book.tres")
-	
+	var map: ItemData = preload("res://items/map.tres")	
 	_register(book)
 	_register(shrimp)
+	_register(map)
 
 func _register(it: ItemData) -> void:
 	if it: _by_id[StringName(it.id)] = it
