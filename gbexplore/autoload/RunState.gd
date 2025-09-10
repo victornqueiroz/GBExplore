@@ -149,6 +149,27 @@ var ROOM_DEFS := [
 		"name": "Path",
 		"type": "land",
 		"tags": ["path", "tutorial"],
+		"npcs": [ {
+				"sprite": "res://npc/girl.png",
+				"tile": Vector2i(4,4),
+				"lines": [
+					"I'm looking for a book I dropped in the forest, but I can't even find the forest anymore…",
+					"Can you help me?"
+				],
+				"need": {
+					"item_id":"book", "amount":1, "uid":"tut_girl_book",
+					"lines_on_give":[
+						"You found my book—thank you!",
+						"…Wait, this isn’t mine. This one's cover has a… tower.",
+						"And it does look exactly like the tower on this map you're holding!",
+						"Where did you get it?!",
+						"My dad is obsessed with maps—he would LOVE to see your map.",
+						"Please take it to him. He’s out fishing somewhere nearby."
+					],
+					"lines_after":[ "I'll keep looking for my book. Try asking my dad about that map!" ]
+				},
+				"talk_uid":"tut_girl_intro"
+			} ],
 		"exits":      {"N": true, "E": false, "S": true, "W": true},
 		"entry_open": {"N": true, "E": false, "S": true, "W": true},
 		"weight": 4,
@@ -165,7 +186,7 @@ var ROOM_DEFS := [
 		"weight": 4,
 		"pickups": [
 			{"x": 4, "y": 4, "item_id": "book", "amount": 1, "uid": "book", "auto": false}],
-		"unique": true,
+		"unique": false,
 		"draftable": true
 	},
 	{
@@ -194,7 +215,7 @@ var ROOM_DEFS := [
 						"There's a marked spot here! Could that be the location of the Hidden Tower?!",
 						"You should go check it out before the ground starts shifting again!"
 					],
-					"lines_after":[ "Go find the Hidden Tower quick!" ]
+					"lines_after":[ "You should go find the Hidden Tower before the ground starts shifting again!" ]
 				},
 			}
 		]
