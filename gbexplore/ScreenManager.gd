@@ -10,6 +10,7 @@ const EXIT_BAND := 4
 const ITEM_PICKUP_SCENE := preload("res://actors/ItemPickup.tscn")
 const NPC_SCENE := preload("res://NPC.tscn")
 const CHEST_SCENE := preload("res://actors/Chest.tscn")
+const FLOOR_BUTTON_SCENE := preload("res://actors/FloorButton.tscn")
 
 # --- Edge rocks (visual + collider) ---
 const ROCK_TEX := preload("res://art/boulder.png")
@@ -308,6 +309,7 @@ func _do_room_swap(next_coord: Vector2i, path: String) -> void:
 	_spawn_npcs(room, path)
 	_spawn_chests(room, path)
 	_spawn_pickups(room, path)
+	_spawn_buttons(room, path) 
 
 	# Update run state + spawn player
 	RunState.pos = next_coord
@@ -397,6 +399,7 @@ func _load_room_at(coord: Vector2i, path: String) -> void:
 	RunState.visited[coord] = path
 
 	emit_signal("map_state_changed")
+	
 
 	# rocks for initial room
 	_apply_edge_rocks(room, path, coord)
@@ -409,6 +412,7 @@ func _load_room_at(coord: Vector2i, path: String) -> void:
 	_spawn_npcs(room, path)
 	_spawn_chests(room, path)
 	_spawn_pickups(room, path)
+	_spawn_buttons(room, path) 
 
 # -------------------------------
 # Input / UI
@@ -1041,3 +1045,55 @@ func _fade_reset_to_clear() -> void:
 	if is_instance_valid(fade_black):
 		var c := fade_black.color
 		fade_black.color = Color(c.r, c.g, c.b, 0.0)	# start fully transparent
+
+
+# -------------------------------
+# BUTTON SETUP (actors/ButtonSetup.gd)
+# -------------------------------
+func _populate_button_setups(room: Node) -> void:
+	# Find every ButtonSetup under this room and let it spawn its buttons
+	for setup in room.get_tree().get_nodes_in_group("button_setup"):
+		# Only setups that belong to THIS room (not other rooms still in tree)
+		if room.is_ancestor_of(setup) and setup.has_method("populate"):
+			setup.populate(room)
+			
+
+func _spawn_buttons(room: Node2D, room_path: String) -> void:
+	var def: Dictionary = RunState.get_def_by_path(room_path)
+	if def.size() == 0 or not def.has("buttons"):
+		return
+	var arr: Array = def["buttons"] as Array
+	if arr.is_empty():
+		return
+
+	# optional container to keep things tidy
+	if room.has_node("__Buttons"):
+		room.get_node("__Buttons").queue_free()
+	var root := Node2D.new()
+	root.name = "__Buttons"
+	room.add_child(root)
+
+	for item in arr:
+		if not (item is Dictionary):
+			continue
+		var d: Dictionary = item as Dictionary
+		var b := FLOOR_BUTTON_SCENE.instantiate()
+
+		# tile can be Vector2i or [x,y]
+		var t := Vector2i.ZERO
+		if d.has("tile"):
+			var v = d["tile"]
+			if v is Vector2i:
+				t = v
+			elif v is Array and v.size() >= 2:
+				t = Vector2i(int(v[0]), int(v[1]))
+
+		# Direct property assignment (no has_variable)
+		b.tile = t
+		if d.has("key"):
+			b.button_key = String(d["key"])
+		if d.has("one_shot"):
+			b.one_shot = bool(d["one_shot"])
+
+		b.position = Vector2((t.x + 0.5) * TILE, (t.y + 0.5) * TILE)
+		root.add_child(b)

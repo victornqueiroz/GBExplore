@@ -36,6 +36,21 @@ var steps_left: int = START_STEPS
 var visited: Dictionary = {}      # key: Vector2i -> String path used for that coord
 var pos: Vector2i = START_POS     # default; new_run() will also reset to START_POS
 
+# --- Floor button persistence ---
+var _buttons := {}  # Dictionary: key (String) -> bool (true = activated)
+
+func button_is_active(key: String) -> bool:
+	return _buttons.get(key, false)
+
+func button_set_active(key: String, active: bool = true) -> void:
+	_buttons[key] = active
+
+func button_clear(key: String) -> void:
+	_buttons.erase(key)
+
+func buttons_clear_all() -> void:
+	_buttons.clear()
+	
 # Track unique rooms used this run (by path)
 var used_unique := {}
 
@@ -146,7 +161,11 @@ var ROOM_DEFS := [
 		"entry_open": {"N": false, "E": true, "S": false, "W": false},
 		"weight": 4,
 		"unique": true,
-		"draftable": false
+		"draftable": false,
+		"buttons": [
+		{ "tile": Vector2i(4, 3), "key": "tutorial_start_btn_A", "one_shot": true },
+		{ "tile": Vector2i(6, 5) }  # auto-key if no key provided
+	]
 	},
 	{
 		"path": "res://rooms/tutorial_path.tscn",

@@ -1,0 +1,20 @@
+[gd_scene load_steps=5 format=3 uid="uid://c70gxmsqneme6"]
+
+[ext_resource type="Texture2D" uid="uid://dfiqdeyfqiecv" path="res://actors/FloorButton.png" id="1_an67x"]
+[ext_resource type="Script" uid="uid://6smdi3foeiem" path="res://actors/FloorButton.gd" id="1_x780x"]
+[ext_resource type="Texture2D" uid="uid://crvcmrr00v1p6" path="res://actors/FloorButtonPressed.png" id="3_pk1w6"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_an67x"]
+size = Vector2(10, 10)
+
+[node name="FloorButton" type="Area2D"]
+script = ExtResource("1_x780x")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("RectangleShape2D_an67x")
+
+[node name="SpriteIdle" type="Sprite2D" parent="."]
+texture = ExtResource("1_an67x")
+
+[node name="SpritePressed" type="Sprite2D" parent="."]
+texture = ExtResource("3_pk1w6")
