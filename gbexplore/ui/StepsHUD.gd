@@ -1,11 +1,11 @@
 # res://ui/StepsHUD.gd
 extends Control
 
-const PAD := 4
-const MARGIN := 4
-const BG := Color(0, 0, 0, 0.45)   # slightly transparent black
+const PAD := 2
+const MARGIN := 0
+const BG := Color(0, 0, 0, 0.85)   # slightly transparent black
 const FG := Color(1, 1, 1, 1)      # white
-const FONT_SIZE := 10
+const FONT_SIZE := 8
 
 var _last_steps: int = -999
 
@@ -34,7 +34,7 @@ func _update_text(force: bool) -> void:
 	queue_redraw()
 
 func _draw() -> void:
-	var txt =  "STEPS "+ str(_last_steps)
+	var txt =  "Steps: "+ str(_last_steps)
 	# If you prefer a label like "STEPS 12", use: var txt = "STEPS " + str(_last_steps)
 
 	var font: Font = get_theme_default_font()
