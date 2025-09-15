@@ -42,3 +42,8 @@ func _apply_state(active: bool) -> void:
 	if _sprite_legacy:
 		_sprite_legacy.position.y = (1 if active else 0)
 		_sprite_legacy.modulate = (Color(0.8, 1.0, 0.8, 1.0) if active else Color(1, 1, 1, 1))
+
+func deactivate() -> void:
+	RunState.button_clear(_resolved_key())
+	_apply_state(false)
+	monitoring = true

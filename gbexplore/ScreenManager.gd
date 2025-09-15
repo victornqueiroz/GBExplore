@@ -413,7 +413,6 @@ func _load_room_at(coord: Vector2i, path: String) -> void:
 	_spawn_chests(room, path)
 	_spawn_pickups(room, path)
 	_spawn_buttons(room, path) 
-
 # -------------------------------
 # Input / UI
 # -------------------------------
