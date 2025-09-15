@@ -153,15 +153,27 @@ func _propose_transition(dir: Vector2i) -> void:
 			_refresh_edge_rocks_for_current_room()
 		return
 
+	# already set above:
+# var next := RunState.pos + dir
+
 	# New destination: pick candidates
 	var entry_side := _entry_side_for_dir(dir)
 	var base_candidates: Array = RunState.pick_room_candidates(entry_side, 12)
 
-	# constrain options at map edges
+	# --- Force-inject Hidden Tower at (0,0) and put it FIRST ---
+	if next == Vector2i(0, 0):
+		var tower_path := "res://rooms/room_hidden_tower.tscn"
+		if not RunState.used_unique.has(tower_path):
+			var tower_def := RunState.get_def_by_path(tower_path)
+			if tower_def.size() > 0:
+				# remove if already present (just in case), then put it first
+				base_candidates = base_candidates.filter(func(d): return String(d.get("path","")) != tower_path)
+				base_candidates.push_front(tower_def)
+
+	# then continue with your existing edge constraints using `next`
 	var nx := next.x
 	var ny := next.y
 	candidate_defs = _edge_constrained_candidates(base_candidates, nx, ny)
-
 	# Prepare UI text
 	for i in range(option_buttons.size()):
 		if i < candidate_defs.size():
@@ -203,15 +215,16 @@ func _has_kind(def: Dictionary, kind: String) -> bool:
 # Southmost row → allow beach only there (forbid elsewhere)
 # Top row → allow mountain only there (forbid elsewhere)
 # Leftmost col → only "path" (unchanged rule)
-func _edge_constrained_candidates(base: Array, nx:int, ny:int) -> Array:
-	# Far-left column: only path
-	if nx == 0:
-		var only_path: Array = []
-		for def in base:
-			if typeof(def) == TYPE_DICTIONARY and _has_kind(def, "path"):
-				only_path.append(def)
-		return only_path if only_path.size() > 0 else base
+func _edge_constrained_candidates(base: Array, nx: int, ny: int) -> Array:
+	# 1) Keep any candidates explicitly pinned to this coord (e.g., only_at)
+	var pinned: Array = []
+	for def in base:
+		if typeof(def) == TYPE_DICTIONARY and def.has("only_at"):
+			var at := RunState._coord_from_def(def["only_at"])
+			if at == Vector2i(nx, ny):
+				pinned.append(def)
 
+	# 2) Apply normal filters to the rest
 	var filtered: Array = []
 	var forbid_beach := (ny != GRID_H - 1)
 	var forbid_mountain := (ny != 0)
@@ -219,15 +232,36 @@ func _edge_constrained_candidates(base: Array, nx:int, ny:int) -> Array:
 	for def in base:
 		if typeof(def) != TYPE_DICTIONARY:
 			continue
+
+		# Skip pinned rooms from filtering (already ensured)
+		if pinned.has(def):
+			continue
+
 		if forbid_beach and _has_kind(def, "beach"):
 			continue
 		if forbid_mountain and _has_kind(def, "mountain"):
 			continue
+
 		filtered.append(def)
 
-	# If everything got filtered (rare), fall back so the player isn't stuck
-	return filtered if filtered.size() > 0 else base
+	# 3) Merge pinned + filtered
+	var result := pinned + filtered
 
+	# 4) Fallback if over-filtered
+	if result.size() == 0:
+		result = base
+
+	# 5) Deduplicate by path
+	var seen := {}
+	var unique: Array = []
+	for d in result:
+		var p := String(d.get("path",""))
+		if not seen.has(p):
+			seen[p] = true
+			unique.append(d)
+
+	return unique	
+	
 func _on_option_pressed(index: int) -> void:
 	var next := RunState.pos + pending_dir
 	var def: Dictionary = candidate_defs[index]

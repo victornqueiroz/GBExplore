@@ -24,7 +24,7 @@ var _dest_marker_enabled: bool = false
 var _dest_marker_coord: Vector2i = Vector2i(0, 0)
 
 # With an even grid, there are 4 “central” tiles; we’ll pick (4,4)
-const START_POS := Vector2i(1,0)   # -> (4, 4)
+const START_POS := Vector2i(3,3)   # -> (4, 4)
 
 # The trade UID in tutorial_hut that should force steps to 1 after trade completes
 const TUTORIAL_FISHER_TRADE_UID := "tut_fisherman_book"
@@ -78,6 +78,7 @@ func mark_trade_done(uid: String) -> void:
 					d["draftable"] = false
 		# NEW: show a destination marker at (0,0)
 		enable_destination_marker_at(Vector2i(0, 0))
+		disable_all_tutorial_rooms()
 			
 # Has the NPC already explained their need this run?
 var _npc_need_intro := {}  # uid -> true
@@ -251,11 +252,12 @@ var ROOM_DEFS := [
 		"path": "res://rooms/tutorial_hut.tscn",
 		"name": "Hut",
 		"type": "lake",
-		"tags": ["land","water"],
-		"exits":      {"N": false, "E": true, "S": false, "W": true},
-		"entry_open": {"N": false, "E": true, "S": false, "W": true},
+		"tags": ["land","water", "tutorial"],
+		"exits":      {"N": false, "E": false, "S": false, "W": true},
+		"entry_open": {"N": false, "E": false, "S": false, "W": true},
 		"weight": 2,
 		"unique": true,
+		"draftable": true,
 		"npcs": [
 			{
 				"sprite": "res://npc/fisherman.png",
@@ -284,8 +286,8 @@ var ROOM_DEFS := [
 	"name": "Altair",
 	"type": "puzzle",
 	"tags": ["puzzle"],
-	"exits":      {"N": true, "E": false, "S": true, "W": false},
-	"entry_open": {"N": true, "E": false, "S": true, "W": false},
+	"exits":      {"N": false, "E": false, "S": true, "W": false},
+	"entry_open": {"N": false, "E": false, "S": true, "W": false},
 	"weight": 4,
 	"unique": true,
 	"buttons": [
@@ -315,8 +317,9 @@ var ROOM_DEFS := [
 		"exits":      {"N": false, "E": false, "S": true, "W": false},
 		"entry_open": {"N": false, "E": false, "S": true, "W": false},
 		"weight": 4,
+		"only_at": Vector2i(0, 0),
 		"unique": true,
-		"draftable": true
+		"draftable": false
 	},
 	{
 		"path": "res://rooms/room_windmill.tscn",
@@ -634,6 +637,7 @@ func _ready() -> void:
 	new_run()
 
 func new_run() -> void:
+	disable_all_tutorial_rooms()
 	seed = int(Time.get_unix_time_from_system())
 	rng.seed = seed
 	steps_left = START_STEPS
@@ -710,36 +714,51 @@ func pick_room_candidates(entry_side: String, count: int) -> Array:
 	return out
 
 # Neighbor-aware picker for a specific coord (recommended from ScreenManager)
+func _coord_from_def(v) -> Vector2i:
+	if v is Vector2i:
+		return v
+	if v is Array and v.size() >= 2:
+		return Vector2i(int(v[0]), int(v[1]))
+	return Vector2i(-9999, -9999) # impossible
+
 func pick_room_candidates_for_coord(entry_side: String, coord: Vector2i, count: int) -> Array:
-	var eligible: Array = []
+	var pinned: Array = []
+	var general: Array = []
+
+	# Split pinned vs general; apply basic eligibility & neighbor checks
 	for def in ROOM_DEFS:
+		if typeof(def) != TYPE_DICTIONARY:
+			continue
+
+		# Skip rooms pinned to other coords
+		if def.has("only_at"):
+			var only_at := _coord_from_def(def["only_at"])
+			if only_at != coord:
+				continue
+
 		if _is_def_eligible_for_entry(def, entry_side):
-			var p: String = String(def["path"])
-			if def.has("unique") and def["unique"] and used_unique.has(p):
-				continue
-			if def_compatible_with_neighbors(coord, entry_side, def):
-				eligible.append(def)
+			var p := String(def.get("path", ""))
+			if not (def.get("unique", false) and used_unique.has(p)) and def_compatible_with_neighbors(coord, entry_side, def):
+				if def.has("only_at"):
+					pinned.append(def)   # pinned to THIS coord
+				else:
+					general.append(def)
 
-	# Fallback if nothing matched strict rules
-	if eligible.size() == 0:
-		for def2 in ROOM_DEFS:
-			var p2: String = String(def2["path"])
-			if def2.has("unique") and def2["unique"] and used_unique.has(p2):
-				continue
-			if def_compatible_with_neighbors(coord, entry_side, def2):
-				eligible.append(def2)
-
-	# --- Curated filter (by current room + side) ---
+	# Apply curated filter to general candidates only (pinned always survive)
+	var eligible := general
 	var cur_path := _current_room_path()
 	var curated_paths: Array = get_curated_draft_paths(cur_path, entry_side)
 	if curated_paths.size() > 0:
 		eligible = eligible.filter(func(d):
-			var p := String(d.get("path", ""))
-			return curated_paths.has(p)
+			return curated_paths.has(String(d.get("path", "")))
 		)
 
-	return _weighted_pick_without_replacement(eligible, count)
+	# Union: always include pinned rooms (no duplicates)
+	for d in pinned:
+		if not eligible.any(func(x): return String(x.get("path","")) == String(d.get("path",""))):
+			eligible.append(d)
 
+	return _weighted_pick_without_replacement(eligible, count)
 # Mark a room def as consumed if it's unique (call when the user picks one)
 func mark_used_if_unique(def: Dictionary) -> void:
 	if def.has("unique") and def["unique"]:
@@ -958,3 +977,10 @@ func has_destination_marker() -> bool:
 
 func get_destination_marker_coord() -> Vector2i:
 	return _dest_marker_coord
+
+func disable_all_tutorial_rooms() -> void:
+	for d in ROOM_DEFS:
+		if typeof(d) == TYPE_DICTIONARY and d.has("path"):
+			var path: String = String(d["path"])
+			if path.get_file().begins_with("tutorial_"):
+				d["draftable"] = false
