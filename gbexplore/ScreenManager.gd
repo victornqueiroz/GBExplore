@@ -81,8 +81,8 @@ func _ready() -> void:
 	# make sure the fade overlay starts fully transparent
 	_fade_reset_to_clear()
 
-	_load_room_at(RunState.pos, "res://rooms/tutorial_start.tscn")
-	#_load_room_at(RunState.pos, "res://rooms/room_start.tscn")
+	#_load_room_at(RunState.pos, "res://rooms/tutorial_start.tscn")
+	_load_room_at(RunState.pos, "res://rooms/room_altair.tscn")
 	player.position = Vector2(SCREEN_SIZE.x / 2.0 + 16, SCREEN_SIZE.y / 2.0)
 	_update_hud()
 	_close_choice_panel()
@@ -155,8 +155,8 @@ func _propose_transition(dir: Vector2i) -> void:
 
 	# New destination: pick candidates
 	var entry_side := _entry_side_for_dir(dir)
-	var base_candidates: Array = RunState.pick_room_candidates_for_coord(entry_side, next, 12)
-	
+	var base_candidates: Array = RunState.pick_room_candidates(entry_side, 12)
+
 	# constrain options at map edges
 	var nx := next.x
 	var ny := next.y
