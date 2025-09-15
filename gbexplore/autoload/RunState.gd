@@ -308,6 +308,17 @@ var ROOM_DEFS := [
 		"draftable": false
 	},
 	{
+		"path": "res://rooms/room_hidden_tower.tscn",
+		"name": "???",
+		"type": "tower",
+		"tags": ["tower"],
+		"exits":      {"N": false, "E": false, "S": true, "W": false},
+		"entry_open": {"N": false, "E": false, "S": true, "W": false},
+		"weight": 4,
+		"unique": true,
+		"draftable": true
+	},
+	{
 		"path": "res://rooms/room_windmill.tscn",
 		"name": "Windmill",
 		"type": "land",
