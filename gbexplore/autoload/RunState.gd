@@ -8,7 +8,7 @@ const START_STEPS := 30
 const GRID_W := 8
 const GRID_H := 8
 
-const START_ROOM_PATH := "res://rooms/room_start.tscn"
+const START_ROOM_PATH := "res://rooms/tutorial_start.tscn"
 
 # Mutable start room (so we can switch mid-run, e.g. after the tutorial)
 var _start_room_path_runtime: String = START_ROOM_PATH
@@ -35,6 +35,7 @@ var seed: int = 0
 var steps_left: int = START_STEPS
 var visited: Dictionary = {}      # key: Vector2i -> String path used for that coord
 var pos: Vector2i = START_POS     # default; new_run() will also reset to START_POS
+
 
 # --- Floor button persistence ---
 var _buttons := {}  # Dictionary: key (String) -> bool (true = activated)
@@ -315,6 +316,7 @@ var ROOM_DEFS := [
 		"exits":      {"N": false, "E": false, "S": true, "W": false},
 		"entry_open": {"N": false, "E": false, "S": true, "W": false},
 		"weight": 4,
+		"only_at": Vector2i(0, 0),
 		"unique": true,
 		"draftable": true
 	},
@@ -713,6 +715,11 @@ func pick_room_candidates(entry_side: String, count: int) -> Array:
 func pick_room_candidates_for_coord(entry_side: String, coord: Vector2i, count: int) -> Array:
 	var eligible: Array = []
 	for def in ROOM_DEFS:
+		if def.has("only_at"):
+			var only_at := _coord_from_def(def["only_at"])
+			if coord != only_at:
+				continue
+
 		if _is_def_eligible_for_entry(def, entry_side):
 			var p: String = String(def["path"])
 			if def.has("unique") and def["unique"] and used_unique.has(p):
@@ -958,3 +965,10 @@ func has_destination_marker() -> bool:
 
 func get_destination_marker_coord() -> Vector2i:
 	return _dest_marker_coord
+
+func _coord_from_def(v) -> Vector2i:
+	if v is Vector2i:
+		return v
+	if v is Array and v.size() >= 2:
+		return Vector2i(int(v[0]), int(v[1]))
+	return Vector2i(-9999, -9999) # impossible
