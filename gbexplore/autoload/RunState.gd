@@ -278,6 +278,24 @@ var ROOM_DEFS := [
 			}
 		]
 	},
+	
+	{
+	"path": "res://rooms/room_altair.tscn",
+	"name": "Altair",
+	"type": "puzzle",
+	"tags": ["puzzle"],
+	"exits":      {"N": true, "E": false, "S": true, "W": false},
+	"entry_open": {"N": true, "E": false, "S": true, "W": false},
+	"weight": 4,
+	"unique": true,
+	"buttons": [
+		{ "tile": Vector2i(2, 5), "puzzle_index": 1, "one_shot": false, "auto_deactivate_on_exit": true },
+		{ "tile": Vector2i(3, 5), "puzzle_index": 2, "one_shot": false, "auto_deactivate_on_exit": true },
+		{ "tile": Vector2i(4, 5), "puzzle_index": 3, "one_shot": false, "auto_deactivate_on_exit": true },
+		{ "tile": Vector2i(5, 5), "puzzle_index": 4, "one_shot": false, "auto_deactivate_on_exit": true },
+		{ "tile": Vector2i(6, 5), "puzzle_index": 5, "one_shot": false, "auto_deactivate_on_exit": true }
+	]
+},
 	{
 		"path": "res://rooms/room_start2.tscn",
 		"name": "Start",

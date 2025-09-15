@@ -81,8 +81,8 @@ func _ready() -> void:
 	# make sure the fade overlay starts fully transparent
 	_fade_reset_to_clear()
 
-	_load_room_at(RunState.pos, "res://rooms/tutorial_start.tscn")
-	#_load_room_at(RunState.pos, "res://rooms/room_beach_special.tscn")
+	#_load_room_at(RunState.pos, "res://rooms/tutorial_start.tscn")
+	_load_room_at(RunState.pos, "res://rooms/room_altair.tscn")
 	player.position = Vector2(SCREEN_SIZE.x / 2.0 + 16, SCREEN_SIZE.y / 2.0)
 	_update_hud()
 	_close_choice_panel()
@@ -310,6 +310,10 @@ func _do_room_swap(next_coord: Vector2i, path: String) -> void:
 	_spawn_chests(room, path)
 	_spawn_pickups(room, path)
 	_spawn_buttons(room, path) 
+	
+	var puzzle = room.get_node_or_null("AltairPuzzle")
+	if puzzle and puzzle.has_method("connect_buttons"):
+		puzzle.connect_buttons()
 
 	# Update run state + spawn player
 	RunState.pos = next_coord
@@ -413,6 +417,11 @@ func _load_room_at(coord: Vector2i, path: String) -> void:
 	_spawn_chests(room, path)
 	_spawn_pickups(room, path)
 	_spawn_buttons(room, path) 
+	
+	
+	var puzzle = room.get_node_or_null("AltairPuzzle")
+	if puzzle and puzzle.has_method("connect_buttons"):
+		puzzle.connect_buttons()
 # -------------------------------
 # Input / UI
 # -------------------------------
@@ -1057,6 +1066,7 @@ func _populate_button_setups(room: Node) -> void:
 			setup.populate(room)
 			
 
+# already present in your file; just add the two lines for puzzle props
 func _spawn_buttons(room: Node2D, room_path: String) -> void:
 	var def: Dictionary = RunState.get_def_by_path(room_path)
 	if def.size() == 0 or not def.has("buttons"):
@@ -1065,7 +1075,6 @@ func _spawn_buttons(room: Node2D, room_path: String) -> void:
 	if arr.is_empty():
 		return
 
-	# optional container to keep things tidy
 	if room.has_node("__Buttons"):
 		room.get_node("__Buttons").queue_free()
 	var root := Node2D.new()
@@ -1078,21 +1087,19 @@ func _spawn_buttons(room: Node2D, room_path: String) -> void:
 		var d: Dictionary = item as Dictionary
 		var b := FLOOR_BUTTON_SCENE.instantiate()
 
-		# tile can be Vector2i or [x,y]
 		var t := Vector2i.ZERO
 		if d.has("tile"):
 			var v = d["tile"]
-			if v is Vector2i:
-				t = v
-			elif v is Array and v.size() >= 2:
-				t = Vector2i(int(v[0]), int(v[1]))
+			if v is Vector2i: t = v
+			elif v is Array and v.size() >= 2: t = Vector2i(int(v[0]), int(v[1]))
 
-		# Direct property assignment (no has_variable)
 		b.tile = t
-		if d.has("key"):
-			b.button_key = String(d["key"])
-		if d.has("one_shot"):
-			b.one_shot = bool(d["one_shot"])
+		if d.has("key"):  b.button_key = String(d["key"])
+		if d.has("one_shot"): b.one_shot = bool(d["one_shot"])
+
+		# NEW: puzzle-specific props
+		if d.has("puzzle_index"): b.puzzle_index = int(d["puzzle_index"])
+		if d.has("auto_deactivate_on_exit"): b.auto_deactivate_on_exit = bool(d["auto_deactivate_on_exit"])
 
 		b.position = Vector2((t.x + 0.5) * TILE, (t.y + 0.5) * TILE)
 		root.add_child(b)
