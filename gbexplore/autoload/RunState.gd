@@ -24,7 +24,7 @@ var _dest_marker_enabled: bool = false
 var _dest_marker_coord: Vector2i = Vector2i(0, 0)
 
 # With an even grid, there are 4 “central” tiles; we’ll pick (4,4)
-const START_POS := Vector2i(3,3)   # -> (4, 4)
+const START_POS := Vector2i(1,1)   # -> (4, 4)
 
 # The trade UID in tutorial_hut that should force steps to 1 after trade completes
 const TUTORIAL_FISHER_TRADE_UID := "tut_fisherman_book"
@@ -37,19 +37,31 @@ var visited: Dictionary = {}      # key: Vector2i -> String path used for that c
 var pos: Vector2i = START_POS     # default; new_run() will also reset to START_POS
 
 # --- Floor button persistence ---
-var _buttons := {}  # Dictionary: key (String) -> bool (true = activated)
+# --- Floor button persistence ---
+signal button_state_changed(key: String, active: bool)
+
+var _buttons := {}  # key -> bool
 
 func button_is_active(key: String) -> bool:
 	return _buttons.get(key, false)
 
 func button_set_active(key: String, active: bool = true) -> void:
+	var prev = _buttons.get(key, false)
 	_buttons[key] = active
+	if prev != active:
+		emit_signal("button_state_changed", key, active)
 
 func button_clear(key: String) -> void:
-	_buttons.erase(key)
+	if _buttons.has(key):
+		_buttons.erase(key)
+		emit_signal("button_state_changed", key, false)
 
 func buttons_clear_all() -> void:
-	_buttons.clear()
+	if _buttons.size() > 0:
+		var keys := _buttons.keys()
+		_buttons.clear()
+		for k in keys:
+			emit_signal("button_state_changed", String(k), false)
 	
 # Track unique rooms used this run (by path)
 var used_unique := {}
@@ -317,6 +329,12 @@ var ROOM_DEFS := [
 		"exits":      {"N": false, "E": true, "S": true, "W": false},
 		"entry_open": {"N": false, "E": true, "S": true, "W": false},
 		"weight": 4,
+		"buttons": [
+		{ "tile": Vector2i(2, 5), "key": "circle", "one_shot": true },
+		{ "tile": Vector2i(4, 5), "key": "triangle", "one_shot": true },
+		{ "tile": Vector2i(6, 5), "key": "square", "one_shot": true }
+	
+	],
 		"only_at": Vector2i(0, 0),
 		"unique": true,
 		"draftable": false
