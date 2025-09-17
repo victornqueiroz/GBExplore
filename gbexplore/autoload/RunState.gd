@@ -24,7 +24,7 @@ var _dest_marker_enabled: bool = false
 var _dest_marker_coord: Vector2i = Vector2i(0, 0)
 
 # With an even grid, there are 4 “central” tiles; we’ll pick (4,4)
-const START_POS := Vector2i(1,1)   # -> (4, 4)
+const START_POS := Vector2i(6,1)   # -> (4, 4)
 
 # The trade UID in tutorial_hut that should force steps to 1 after trade completes
 const TUTORIAL_FISHER_TRADE_UID := "tut_fisherman_book"
@@ -330,9 +330,9 @@ var ROOM_DEFS := [
 		"entry_open": {"N": false, "E": true, "S": true, "W": false},
 		"weight": 4,
 		"buttons": [
-		{ "tile": Vector2i(2, 5), "key": "circle", "one_shot": true },
-		{ "tile": Vector2i(4, 5), "key": "triangle", "one_shot": true },
-		{ "tile": Vector2i(6, 5), "key": "square", "one_shot": true }
+		#{ "tile": Vector2i(2, 5), "key": "circle", "one_shot": true },
+		#{ "tile": Vector2i(4, 5), "key": "triangle", "one_shot": true },
+		#{ "tile": Vector2i(6, 5), "key": "square", "one_shot": true }
 	
 	],
 		"only_at": Vector2i(0, 0),
@@ -512,6 +512,9 @@ var ROOM_DEFS := [
 		"exits":      {"N": true, "E": false, "S": false, "W": true},
 		"entry_open": {"N": true, "E": false, "S": false, "W": true},
 		"weight": 2,
+		"buttons": [
+	{ "tile": Vector2i(4, 4), "key": "triangle", "one_shot": true }
+  ],
 		"unique": true
 	},
 	{
@@ -558,6 +561,21 @@ var ROOM_DEFS := [
 		"unique": false
 	},
 	{
+		"path": "res://rooms/room_puzzle_triangle_beach.tscn",
+		"name": "???",
+		"type": "beach",
+		"tags": ["water","beach", "puzzle", "triangle"],
+		"exits":        {"N": true, "E": true, "S": false, "W": false},
+		"entry_open":   {"N": true, "E": true, "S": false, "W": false},
+		"weight": 3,
+		"unique": true,
+		"buttons": [
+		{ "tile": Vector2i(4, 4), "key": "triangle", "one_shot": true }
+  		],
+		"draftable": true,
+		"only_at": Vector2i(0, 7)
+	},
+	{
 		"path": "res://rooms/room_beach_special.tscn",
 		"name": "Beach ★",
 		"type": "beach",
@@ -598,6 +616,20 @@ var ROOM_DEFS := [
 		"exits":        {"N": false, "E": false, "S": true, "W": false},
 		"entry_open":   {"N": false, "E": false, "S": true, "W": false},
 		"allowed_entry": ["S"],
+		"weight": 3,
+		"unique": true
+	},
+	{
+		"path": "res://rooms/room_puzzle_triangle_mountain.tscn",
+		"name": "???",
+		"type": "mountain",
+		"only_at": Vector2i(7, 0),
+		"tags": ["mountain", "puzzle"],
+		"buttons": [
+	{ "tile": Vector2i(3, 5), "key": "triangle", "one_shot": true }
+  ],
+		"exits":        {"N": false, "E": false, "S": true, "W": true},
+		"entry_open":   {"N": false, "E": false, "S": true, "W": true},
 		"weight": 3,
 		"unique": true
 	}
