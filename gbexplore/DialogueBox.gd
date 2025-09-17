@@ -190,7 +190,7 @@ func _ready() -> void:
 	# ▼ cursor bottom-right
 	if ui_font:
 		hint.add_theme_font_override("font", ui_font)
-	hint.text = "▼"
+	hint.text = "v"
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	hint.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
 	hint.anchor_left = 1.0; hint.anchor_right = 1.0

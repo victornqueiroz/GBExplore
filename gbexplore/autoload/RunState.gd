@@ -2,7 +2,7 @@ extends Node
 # Autoloaded as "RunState" (no class_name here)
 
 # ---------------- Config ----------------
-const START_STEPS := 300 #30
+const START_STEPS := 30 #30
 
 # Canonical world size (keep this in sync with ScreenManager or reference it from there)
 const GRID_W := 8
@@ -24,7 +24,7 @@ var _dest_marker_enabled: bool = false
 var _dest_marker_coord: Vector2i = Vector2i(0, 0)
 
 # With an even grid, there are 4 “central” tiles; we’ll pick (4,4)
-const START_POS := Vector2i(1,1)   # -> (4, 4)
+const START_POS := Vector2i(4,4)   # -> (4, 4)
 
 # The trade UID in tutorial_hut that should force steps to 1 after trade completes
 const TUTORIAL_FISHER_TRADE_UID := "tut_fisherman_book"
@@ -198,10 +198,6 @@ var ROOM_DEFS := [
 		"weight": 4,
 		"unique": true,
 		"draftable": false,
-		"buttons": [
-		{ "tile": Vector2i(4, 3), "key": "tutorial_start_btn_A", "one_shot": true },
-		{ "tile": Vector2i(6, 5) }  # auto-key if no key provided
-	]
 	},
 	{
 		"path": "res://rooms/tutorial_path.tscn",
@@ -405,7 +401,7 @@ var ROOM_DEFS := [
 		"buttons": [
 		{ "tile": Vector2i(2, 6), "key": "triangle", "one_shot": true },
 	],
-		"only_at": Vector2i(2, 1),
+		"only_at": Vector2i(3, 5),#3,5
 		"unique": true
 	},
 	{
@@ -522,9 +518,17 @@ var ROOM_DEFS := [
 					"item_id": "shrimp",
 					"amount": 1,
 					"uid": "fisherman_shrimp_01",
-					"lines_before": ["Do you have a shrimp?"],
-					"lines_on_give": ["Perfect bait—thanks!"],
-					"lines_after": ["Back to the lake!"],
+					"lines_before": 
+						[
+							"What? You didn't know about the SHIFTING? HAHAHA",
+							"Well... this has started a few years ago and no one knows why.",
+							"The whole island shifts every few days and there's nothing we can do about it.",
+							"I've been trying to map it out but I haven't gotten far, unfortunately",
+							"For now I just gotta keep my daughter fed",
+							"By the way... do you have any Shrimp I could use as a bait?"
+					],
+					"lines_on_give": ["You found a Shrimp! AMAZING!", "Thank you!!!"],
+					"lines_after": ["Now I will be able to catch something good!"],
 					"reward": {"item_id": "book", "amount": 1}
 				}
 			}
@@ -606,7 +610,7 @@ var ROOM_DEFS := [
 		{ "tile": Vector2i(4, 4), "key": "triangle", "one_shot": true }
   		],
 		"draftable": true,
-		"only_at": Vector2i(0, 1) #0,7
+		"only_at": Vector2i(0, 7) #0,7
 	},
 	{
 		"path": "res://rooms/room_beach_special.tscn",
@@ -656,7 +660,7 @@ var ROOM_DEFS := [
 		"path": "res://rooms/room_puzzle_triangle_mountain.tscn",
 		"name": "???",
 		"type": "mountain",
-		"only_at": Vector2i(1, 0),#7,0
+		"only_at": Vector2i(7, 0),#7,0
 		"tags": ["mountain", "puzzle"],
 		"buttons": [
 	{ "tile": Vector2i(3, 5), "key": "triangle", "one_shot": true }
@@ -720,7 +724,7 @@ func _ready() -> void:
 	new_run()
 
 func new_run() -> void:
-	disable_all_tutorial_rooms()
+	#disable_all_tutorial_rooms()
 	seed = int(Time.get_unix_time_from_system())
 	rng.seed = seed
 	steps_left = START_STEPS
