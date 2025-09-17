@@ -2,7 +2,7 @@ extends Node
 # Autoloaded as "RunState" (no class_name here)
 
 # ---------------- Config ----------------
-const START_STEPS := 30
+const START_STEPS := 300 #30
 
 # Canonical world size (keep this in sync with ScreenManager or reference it from there)
 const GRID_W := 8
@@ -24,7 +24,7 @@ var _dest_marker_enabled: bool = false
 var _dest_marker_coord: Vector2i = Vector2i(0, 0)
 
 # With an even grid, there are 4 “central” tiles; we’ll pick (4,4)
-const START_POS := Vector2i(6,1)   # -> (4, 4)
+const START_POS := Vector2i(1,1)   # -> (4, 4)
 
 # The trade UID in tutorial_hut that should force steps to 1 after trade completes
 const TUTORIAL_FISHER_TRADE_UID := "tut_fisherman_book"
@@ -37,32 +37,55 @@ var visited: Dictionary = {}      # key: Vector2i -> String path used for that c
 var pos: Vector2i = START_POS     # default; new_run() will also reset to START_POS
 
 # --- Floor button persistence ---
-# --- Floor button persistence ---
 signal button_state_changed(key: String, active: bool)
 
-var _buttons := {}  # key -> bool
+var _button_press_counts := {}
 
 func button_is_active(key: String) -> bool:
-	return _buttons.get(key, false)
+	return _button_press_counts.get(key, 0) > 0
+
+func get_button_press_count(key: String) -> int:
+	return _button_press_counts.get(key, 0)
 
 func button_set_active(key: String, active: bool = true) -> void:
-	var prev = _buttons.get(key, false)
-	_buttons[key] = active
-	if prev != active:
-		emit_signal("button_state_changed", key, active)
+	if active:
+		_button_press_counts[key] = _button_press_counts.get(key, 0) + 1
+	else:
+		_button_press_counts[key] = max(0, _button_press_counts.get(key, 0) - 1)
+
+	# Emit when total count changes (optional but clean)
+	emit_signal("button_state_changed", key, button_is_active(key))
 
 func button_clear(key: String) -> void:
-	if _buttons.has(key):
-		_buttons.erase(key)
-		emit_signal("button_state_changed", key, false)
+	if _button_press_counts.has(key):
+		_button_press_counts[key] = max(0, _button_press_counts[key] - 1)
+		emit_signal("button_state_changed", key, button_is_active(key))	
 
-func buttons_clear_all() -> void:
-	if _buttons.size() > 0:
-		var keys := _buttons.keys()
-		_buttons.clear()
-		for k in keys:
-			emit_signal("button_state_changed", String(k), false)
-	
+# --- NEW: per-instance state + per-group counts ---
+var _button_instances := {}            # instance_id (String) -> bool (pressed?)
+var _button_group_counts := {}         # group_key (String) -> int (pressed count)
+
+func button_instance_is_down(instance_id: String) -> bool:
+	return bool(_button_instances.get(instance_id, false))
+
+func button_instance_set_down(instance_id: String, down: bool) -> void:
+	var prev := bool(_button_instances.get(instance_id, false))
+	if prev == down:
+		return
+	_button_instances[instance_id] = down
+	# optional: emit a signal here if you want per-instance listeners
+	# emit_signal("button_state_changed", instance_id, down)  # if you like
+
+func button_group_count(group_key: String) -> int:
+	return int(_button_group_counts.get(group_key, 0))
+
+func button_group_add(group_key: String, delta: int) -> void:
+	var cur := int(_button_group_counts.get(group_key, 0))
+	var nxt = max(0, cur + delta)
+	_button_group_counts[group_key] = nxt
+	# If you already use this signal for icons, keep it:
+	emit_signal("button_state_changed", group_key, nxt > 0)
+
 # Track unique rooms used this run (by path)
 var used_unique := {}
 
@@ -333,7 +356,6 @@ var ROOM_DEFS := [
 		#{ "tile": Vector2i(2, 5), "key": "circle", "one_shot": true },
 		#{ "tile": Vector2i(4, 5), "key": "triangle", "one_shot": true },
 		#{ "tile": Vector2i(6, 5), "key": "square", "one_shot": true }
-	
 	],
 		"only_at": Vector2i(0, 0),
 		"unique": true,
@@ -370,6 +392,20 @@ var ROOM_DEFS := [
 		"pickups": [
 			{"x": 4, "y": 4, "item_id": "shrimp", "amount": 1, "uid": "shrimp"}
 		],
+		"unique": true
+	},
+	{
+		"path": "res://rooms/room_puzzle_triangle_forest.tscn",
+		"name": "???",
+		"type": "forest",
+		"tags": ["land","forest"],
+		"exits":      {"N": true, "E": true, "S": true, "W": true},
+		"entry_open": {"N": true, "E": true, "S": true, "W": true},
+		"weight": 4,
+		"buttons": [
+		{ "tile": Vector2i(2, 6), "key": "triangle", "one_shot": true },
+	],
+		"only_at": Vector2i(2, 1),
 		"unique": true
 	},
 	{
@@ -512,9 +548,6 @@ var ROOM_DEFS := [
 		"exits":      {"N": true, "E": false, "S": false, "W": true},
 		"entry_open": {"N": true, "E": false, "S": false, "W": true},
 		"weight": 2,
-		"buttons": [
-	{ "tile": Vector2i(4, 4), "key": "triangle", "one_shot": true }
-  ],
 		"unique": true
 	},
 	{
@@ -573,7 +606,7 @@ var ROOM_DEFS := [
 		{ "tile": Vector2i(4, 4), "key": "triangle", "one_shot": true }
   		],
 		"draftable": true,
-		"only_at": Vector2i(0, 7)
+		"only_at": Vector2i(0, 1) #0,7
 	},
 	{
 		"path": "res://rooms/room_beach_special.tscn",
@@ -623,7 +656,7 @@ var ROOM_DEFS := [
 		"path": "res://rooms/room_puzzle_triangle_mountain.tscn",
 		"name": "???",
 		"type": "mountain",
-		"only_at": Vector2i(7, 0),
+		"only_at": Vector2i(1, 0),#7,0
 		"tags": ["mountain", "puzzle"],
 		"buttons": [
 	{ "tile": Vector2i(3, 5), "key": "triangle", "one_shot": true }
