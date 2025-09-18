@@ -81,8 +81,8 @@ func _ready() -> void:
 	# make sure the fade overlay starts fully transparent
 	_fade_reset_to_clear()
 
-	_load_room_at(RunState.pos, "res://rooms/tutorial_start.tscn")
-	#_load_room_at(RunState.pos, "res://rooms/room_start.tscn")
+	#_load_room_at(RunState.pos, "res://rooms/tutorial_start.tscn")
+	_load_room_at(RunState.pos, "res://rooms/room_start.tscn")
 	player.position = Vector2(SCREEN_SIZE.x / 2.0 + 16, SCREEN_SIZE.y / 2.0)
 	_update_hud()
 	_close_choice_panel()
