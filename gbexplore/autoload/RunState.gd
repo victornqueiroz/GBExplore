@@ -186,7 +186,16 @@ var ROOM_DEFS := [
 		"entry_open": {"N": false, "E": true, "S": false, "W": true},
 		"weight": 4,
 		"unique": true,
-		"draftable": false
+		"draftable": false,
+		"props": [
+		{
+			"type": "campfire",
+			"tile": Vector2i(4, 4),     # tile grid position (x, y)
+			"center": true,             # center the sprite in the tile (default true)
+			"offset_px": Vector2(0, -8)  # fine pixel tweak if you need it
+		}
+		],
+
 	},
 	{
 		"path": "res://rooms/tutorial_start.tscn",

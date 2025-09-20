@@ -11,6 +11,7 @@ const ITEM_PICKUP_SCENE := preload("res://actors/ItemPickup.tscn")
 const NPC_SCENE := preload("res://NPC.tscn")
 const CHEST_SCENE := preload("res://actors/Chest.tscn")
 const FLOOR_BUTTON_SCENE := preload("res://actors/FloorButton.tscn")
+const CAMPFIRE_SCENE := preload("res://actors/Campfire.tscn")
 
 # --- Edge rocks (visual + collider) ---
 const ROCK_TEX := preload("res://art/boulder.png")
@@ -67,6 +68,10 @@ var candidate_defs: Array = []
 var _menu_index: int = 0
 var is_transitioning: bool = false	# only suppresses edge checks; player keeps moving
 
+func request_player_sleep() -> void:
+	# Any pre-sleep SFX / analytics hooks can go here later.
+	_game_over()
+
 func _dev_enabled() -> bool:
 	return GameConfig.DEV_MODE
 
@@ -74,6 +79,7 @@ func _show_edge_walls() -> bool:
 	return GameConfig.DEV_MODE and GameConfig.SHOW_EDGE_WALLS
 
 func _ready() -> void:
+	add_to_group("screen_manager")
 	ROCK_LAYER = GameConfig.WALL_LAYER
 	ROCK_MASK = GameConfig.WALL_MASK
 	print("Has /root/ItemDb? ", has_node("/root/ItemDb"))
@@ -339,6 +345,10 @@ func _do_room_swap(next_coord: Vector2i, path: String) -> void:
 	if USE_EDGE_BLOCKERS:
 		_apply_edge_blockers(room, path, next_coord)
 
+	# --- NEW: spawn props (campfire, etc.) ---
+	var def := RunState.get_def_by_path(path)
+	_spawn_room_props(room, def)
+
 	# --- NPCs, chests, pickups ---
 	_spawn_npcs(room, path)
 	_spawn_chests(room, path)
@@ -445,7 +455,11 @@ func _load_room_at(coord: Vector2i, path: String) -> void:
 	# respect the flag
 	if USE_EDGE_BLOCKERS:
 		_apply_edge_blockers(room, path, coord)
-
+	
+	# --- NEW: spawn props (campfire, etc.) ---
+	var def := RunState.get_def_by_path(path)
+	_spawn_room_props(room, def)
+	
 	# also spawn content for the starting room
 	_spawn_npcs(room, path)
 	_spawn_chests(room, path)
@@ -1137,3 +1151,31 @@ func _spawn_buttons(room: Node2D, room_path: String) -> void:
 
 		b.position = Vector2((t.x + 0.5) * TILE, (t.y + 0.5) * TILE)
 		root.add_child(b)
+
+func _spawn_room_props(room: Node, def: Dictionary) -> void:
+	if not def.has("props"):
+		return
+	for p in def["props"]:
+		var typ := str(p.get("type", "")).to_lower()
+		match typ:
+			"campfire":
+				_spawn_prop_campfire(room, p)
+			_:
+				push_warning("Unknown prop type in room def: %s" % typ)
+
+
+func _spawn_prop_campfire(room: Node, p: Dictionary) -> void:
+	var node := CAMPFIRE_SCENE.instantiate()
+	# tile position (Vector2i) → pixel position
+	var tile: Vector2i = p.get("tile", Vector2i(4, 4))
+	var px := Vector2(tile.x * TILE, tile.y * TILE)
+
+	# center within tile (default true)
+	if p.get("center", true):
+		px += Vector2(TILE * 0.5, TILE * 0.5)
+
+	# optional fine offset in pixels
+	var off: Vector2 = p.get("offset_px", Vector2.ZERO)
+	node.position = px + off
+
+	room.add_child(node)

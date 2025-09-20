@@ -1,5 +1,13 @@
 extends Control
 signal finished
+signal choice_made(chose_yes: bool)
+
+var _ask_mode: bool = false
+var _awaiting_choice: bool = false
+var _choice_index: int = 0          # 0 = Yes, 1 = No
+var _ask_prompt_text: String = ""   # base text of the question (without choice line)
+var _saved_align: int = HORIZONTAL_ALIGNMENT_LEFT
+var _saved_wrap: int = TextServer.AUTOWRAP_WORD
 
 # ====== DESIGN HOOKS =================================================
 @export var ui_font: FontFile
@@ -26,7 +34,6 @@ signal finished
 # inset to keep the outer line fully inside the DialogueBox rect (prevents edge clipping)
 @export var border_outer_inset_px: int = 1
 
-
 const TYPE_SPEED := 60.0
 
 # ====== NODES ========================================================
@@ -34,7 +41,7 @@ const TYPE_SPEED := 60.0
 @onready var bg: ColorRect               = $BG
 @onready var container: MarginContainer  = $MarginContainer
 @onready var text: RichTextLabel         = $MarginContainer/RichTextLabel
-@onready var hint: Label = $Label 
+@onready var hint: Label                 = $Label
 @onready var portrait: TextureRect       = $Portrait
 
 # ====== STATE ========================================================
@@ -66,13 +73,12 @@ func _make_stylebox_outline(col: Color, w: int) -> StyleBoxFlat:
 	return sb
 
 # ====== LAYOUT =======================================================
-# Fixed-pixel layout at the bottom with screen margins
 func _apply_layout() -> void:
 	# width: full, but inset by side margins
 	anchor_left = 0.0; anchor_right = 1.0
 	offset_left = screen_margin_side_px
 	offset_right = -screen_margin_side_px
-	
+
 	# height: fixed pixels; bottom-aligned with bottom margin
 	anchor_bottom = 1.0
 	anchor_top = 1.0
@@ -139,7 +145,6 @@ func _ensure_code_border() -> void:
 	# BG should fill EXACTLY the space inside the outer border (match visual box)
 	_layout_bg_to_border()
 
-# Make BG ColorRect fill the same area that the OUTER border encloses
 func _layout_bg_to_border() -> void:
 	var k: int = 0
 	if use_code_border:
@@ -165,7 +170,7 @@ func _ready() -> void:
 	dimmer.color = _with_alpha(Color.BLACK, 0.0)
 
 	_ensure_code_border()
-	
+
 	# Make the text fill the container; containers ignore anchors, use size flags.
 	text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	text.size_flags_vertical   = Control.SIZE_EXPAND_FILL
@@ -175,7 +180,6 @@ func _ready() -> void:
 	container.anchor_top  = 0.0;  container.anchor_bottom = 1.0
 	container.offset_left = 0;    container.offset_right = 0
 	container.offset_top  = 0;    container.offset_bottom = 0
-
 
 	# Text look
 	if ui_font:
@@ -209,7 +213,6 @@ func _ready() -> void:
 
 	visible = false
 
-# Called automatically when the control’s size changes (e.g., window resize)
 func _size_changed() -> void:
 	_apply_layout()
 	_ensure_code_border()
@@ -245,6 +248,31 @@ func open(lines: PackedStringArray, face: Texture2D = null, side: String = "left
 	if _pages.size() == 0:
 		_pages.append("")
 	_show_page()
+
+func ask_yes_no(line: String) -> void:
+	# Show the question first
+	_ask_mode = true
+	_awaiting_choice = true
+	_choice_index = 0
+	_ask_prompt_text = line
+
+	# Save current text alignment/wrap and switch to menu-friendly settings
+	_saved_align = text.horizontal_alignment
+	_saved_wrap  = text.autowrap_mode
+	text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	text.autowrap_mode = TextServer.AUTOWRAP_OFF
+
+	await open(PackedStringArray([line]))
+	_typing = false
+	text.visible_characters = -1
+	_update_choice_visual()
+
+	if is_instance_valid(hint):
+		hint.text = ""
+		hint.visible = true
+		hint.modulate.a = 1.0
+
+
 
 func _process(delta: float) -> void:
 	if _cooldown > 0.0: _cooldown -= delta
@@ -304,23 +332,69 @@ func close() -> void:
 	_page_idx = 0
 	_typing = false
 	_typed = 0.0
+	_ask_mode = false
+	_awaiting_choice = false
 	text.visible_characters = -1
 	text.text = ""
 	portrait.visible = false
 	emit_signal("finished")
 
+# ====== INPUT ========================================================
 func _unhandled_input(event: InputEvent) -> void:
-	if not visible or _cooldown > 0.0: return
+	if not visible or _cooldown > 0.0:
+		return
+
+	# Choice mode: arrows to move, Enter/E to confirm. No cancel shortcut.
+	if _ask_mode and _awaiting_choice:
+		if event.is_action_pressed("ui_left") or event.is_action_pressed("ui_up"):
+			_move_choice(-1)
+			get_viewport().set_input_as_handled()
+			return
+		if event.is_action_pressed("ui_right") or event.is_action_pressed("ui_down"):
+			_move_choice(1)
+			get_viewport().set_input_as_handled()
+			return
+		if event.is_action_pressed("ui_accept") or event.is_action_pressed("interact"):
+			_end_choice(_choice_index == 0)
+			get_viewport().set_input_as_handled()
+			return
+		# While in ask-mode, don't advance pages with other inputs.
+		return
+
+	# Normal page-advance behavior (unchanged)
 	if event.is_action_pressed("ui_accept") or event.is_action_pressed("interact"):
-		next(); get_viewport().set_input_as_handled()
+		next()
+		get_viewport().set_input_as_handled()
 	elif event.is_action_pressed("ui_cancel"):
-		close(); get_viewport().set_input_as_handled()
+		close()
+		get_viewport().set_input_as_handled()
 
 func _gui_input(event: InputEvent) -> void:
 	if not visible or _cooldown > 0.0: return
 	if event is InputEventMouseButton and event.pressed:
 		next(); accept_event()
 
+# ====== CHOICE RENDERING =============================================
+func _move_choice(dir: int) -> void:
+	# dir: -1 = move left/up, +1 = move right/down
+	if dir < 0:
+		_choice_index = 0
+	else:
+		_choice_index = 1
+	_update_choice_visual()
+	
+func _update_choice_visual() -> void:
+	# Render centered choices on their own line
+	var yes := "> Yes" if _choice_index == 0 else "  Yes"
+	var no  := "> No"  if _choice_index == 1 else "No"
+	# Add extra spaces just to give them a bit of breathing room
+	var line := "%s\n%s      %s" % [_ask_prompt_text, yes, no]
+
+	text.text = line
+	text.visible_characters = -1
+	hint.visible = true
+	_blink_t = 0.0
+	
 # ====== PAGINATION ===================================================
 func _build_pages_by_label(lines: PackedStringArray) -> PackedStringArray:
 	var pages := PackedStringArray()
@@ -366,7 +440,7 @@ func _place_portrait(side: String) -> void:
 		portrait.anchor_left = 0.0
 		portrait.offset_left = 6
 	portrait.anchor_top = 0.0
-	portrait.offset_top = -h + 2   # change to 2 to place inside the bar
+	portrait.offset_top = -h + 2
 	portrait.visible = true
 
 func _text_max_height() -> float:
@@ -375,3 +449,18 @@ func _text_max_height() -> float:
 	if use_code_border:
 		h -= float(border_outer_px + border_inner_px + 2*border_outer_inset_px + border_gap_px)
 	return max(h, 16.0)
+
+
+
+
+func _end_choice(val: bool) -> void:
+	_ask_mode = false
+	_awaiting_choice = false
+	# Restore label settings
+	text.horizontal_alignment = _saved_align
+	text.autowrap_mode = _saved_wrap
+	if is_instance_valid(hint):
+		hint.text = "v"
+	close()
+	emit_signal("choice_made", val)
+	
