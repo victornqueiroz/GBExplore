@@ -51,7 +51,7 @@ script = ExtResource("1_afo8p")
 [node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="."]
 sprite_frames = SubResource("SpriteFrames_k4ei7")
 autoplay = "default"
-frame_progress = 0.342778
+frame_progress = 0.790326
 
 [node name="Area2D" type="Area2D" parent="."]
 

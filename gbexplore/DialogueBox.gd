@@ -8,6 +8,24 @@ var _choice_index: int = 0          # 0 = Yes, 1 = No
 var _ask_prompt_text: String = ""   # base text of the question (without choice line)
 var _saved_align: int = HORIZONTAL_ALIGNMENT_LEFT
 var _saved_wrap: int = TextServer.AUTOWRAP_WORD
+var _locked_by_ask: bool = false
+
+func _lock_player() -> void:
+	var sm := get_tree().get_first_node_in_group("screen_manager")
+	if sm:
+		var pl := sm.get_node_or_null("Player")
+		if pl and "set_input_enabled" in pl:
+			pl.set_input_enabled(false)
+
+func _unlock_player_if_needed() -> void:
+	if not _locked_by_ask:
+		return
+	var sm := get_tree().get_first_node_in_group("screen_manager")
+	if sm:
+		var pl := sm.get_node_or_null("Player")
+		if pl and "set_input_enabled" in pl:
+			pl.set_input_enabled(true)
+	_locked_by_ask = false
 
 # ====== DESIGN HOOKS =================================================
 @export var ui_font: FontFile
@@ -250,13 +268,15 @@ func open(lines: PackedStringArray, face: Texture2D = null, side: String = "left
 	_show_page()
 
 func ask_yes_no(line: String) -> void:
-	# Show the question first
 	_ask_mode = true
 	_awaiting_choice = true
 	_choice_index = 0
 	_ask_prompt_text = line
 
-	# Save current text alignment/wrap and switch to menu-friendly settings
+	# lock player input (same as draft menu)
+	_locked_by_ask = true
+	_lock_player()
+
 	_saved_align = text.horizontal_alignment
 	_saved_wrap  = text.autowrap_mode
 	text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -271,8 +291,6 @@ func ask_yes_no(line: String) -> void:
 		hint.text = ""
 		hint.visible = true
 		hint.modulate.a = 1.0
-
-
 
 func _process(delta: float) -> void:
 	if _cooldown > 0.0: _cooldown -= delta
@@ -324,6 +342,9 @@ func next() -> void:
 		close()
 
 func close() -> void:
+	# if ask-mode locked input, make sure we restore it even on early close
+	_unlock_player_if_needed()
+
 	var tw: Tween = create_tween()
 	tw.tween_property(dimmer, "color", _with_alpha(Color.BLACK, 0.0), 0.08)
 	await tw.finished
@@ -338,7 +359,8 @@ func close() -> void:
 	text.text = ""
 	portrait.visible = false
 	emit_signal("finished")
-
+	
+	
 # ====== INPUT ========================================================
 func _unhandled_input(event: InputEvent) -> void:
 	if not visible or _cooldown > 0.0:
@@ -456,11 +478,15 @@ func _text_max_height() -> float:
 func _end_choice(val: bool) -> void:
 	_ask_mode = false
 	_awaiting_choice = false
-	# Restore label settings
+
+	# restore label settings
 	text.horizontal_alignment = _saved_align
 	text.autowrap_mode = _saved_wrap
 	if is_instance_valid(hint):
 		hint.text = "v"
+
+	# give control back if we locked it here
+	_unlock_player_if_needed()
+
 	close()
 	emit_signal("choice_made", val)
-	
