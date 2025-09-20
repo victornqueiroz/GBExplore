@@ -33,7 +33,7 @@ func _unlock_player_if_needed() -> void:
 @export var portrait_max_height: float = 56.0
 
 # Fixed pixel height + separate margins from the screen edges
-@export var bar_height_px: int = 44
+@export var bar_height_px: int = 56
 @export var screen_margin_side_px: int = 10
 @export var screen_margin_bottom_px: int = 6
 
@@ -237,6 +237,11 @@ func _size_changed() -> void:
 
 # ====== OPEN/CLOSE & TYPEWRITER =====================================
 func open(lines: PackedStringArray, face: Texture2D = null, side: String = "left") -> void:
+	# --- make sure text uses NORMAL dialog layout ---
+	text.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	text.autowrap_mode = TextServer.AUTOWRAP_WORD
+	# ------------------------------------------------
+
 	if face != null:
 		portrait.texture = face
 		portrait.modulate.a = 1.0
@@ -266,32 +271,40 @@ func open(lines: PackedStringArray, face: Texture2D = null, side: String = "left
 	if _pages.size() == 0:
 		_pages.append("")
 	_show_page()
-
+	
+	
 func ask_yes_no(line: String) -> void:
 	_ask_mode = true
 	_awaiting_choice = true
 	_choice_index = 0
 	_ask_prompt_text = line
 
-	# lock player input (same as draft menu)
+	# lock player input immediately
 	_locked_by_ask = true
 	_lock_player()
 
+	# Save current label settings (NORMAL dialog look)
 	_saved_align = text.horizontal_alignment
 	_saved_wrap  = text.autowrap_mode
+
+	# First open as a normal page (left + wrapped) so sizing is correct
+	await open(PackedStringArray([line]))
+
+	# Now switch to menu look (centered, no wrap) for the Yes/No line
 	text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	text.autowrap_mode = TextServer.AUTOWRAP_OFF
 
-	await open(PackedStringArray([line]))
+	# Stop typing and render the choice line
 	_typing = false
 	text.visible_characters = -1
 	_update_choice_visual()
 
 	if is_instance_valid(hint):
-		hint.text = ""
+		hint.text = ""     # no caret while choosing
 		hint.visible = true
 		hint.modulate.a = 1.0
-
+		
+		
 func _process(delta: float) -> void:
 	if _cooldown > 0.0: _cooldown -= delta
 
@@ -342,8 +355,7 @@ func next() -> void:
 		close()
 
 func close() -> void:
-	# if ask-mode locked input, make sure we restore it even on early close
-	_unlock_player_if_needed()
+	
 
 	var tw: Tween = create_tween()
 	tw.tween_property(dimmer, "color", _with_alpha(Color.BLACK, 0.0), 0.08)
@@ -359,6 +371,8 @@ func close() -> void:
 	text.text = ""
 	portrait.visible = false
 	emit_signal("finished")
+	# if ask-mode locked input, make sure we restore it even on early close
+	_unlock_player_if_needed()
 	
 	
 # ====== INPUT ========================================================
@@ -419,12 +433,15 @@ func _update_choice_visual() -> void:
 	
 # ====== PAGINATION ===================================================
 func _build_pages_by_label(lines: PackedStringArray) -> PackedStringArray:
+	var prev_wrap := text.autowrap_mode
+	text.autowrap_mode = TextServer.AUTOWRAP_WORD   # ensure measuring with wrap
+
 	var pages := PackedStringArray()
 	var page_buf := ""
 	var max_h: float = _text_max_height()
-
 	if max_h <= 1.0:
 		max_h = max(size.y - 16.0, 64.0)
+
 	for para in lines:
 		var words := String(para).split(" ")
 		for w in words:
@@ -443,12 +460,17 @@ func _build_pages_by_label(lines: PackedStringArray) -> PackedStringArray:
 				page_buf = ""
 			else:
 				page_buf = with_break
+
 	if page_buf.strip_edges() != "":
 		pages.append(page_buf.strip_edges())
 	if pages.size() == 0:
 		pages.append("")
-	return pages
 
+	# restore whatever the caller expects (open() sets WORD anyway)
+	text.autowrap_mode = prev_wrap
+	return pages
+	
+	
 # ====== PORTRAIT =====================================================
 func _place_portrait(side: String) -> void:
 	if portrait.texture == null: return
