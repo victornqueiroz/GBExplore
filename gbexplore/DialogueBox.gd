@@ -35,7 +35,7 @@ func _unlock_player_if_needed() -> void:
 # Fixed pixel height + separate margins from the screen edges
 @export var bar_height_px: int = 56
 @export var screen_margin_side_px: int = 10
-@export var screen_margin_bottom_px: int = 6
+@export var screen_margin_bottom_px: int = 0
 
 # Box fill (inside the border)
 @export var box_fill_color: Color = Color.BLACK
@@ -218,7 +218,7 @@ func _ready() -> void:
 	hint.anchor_left = 1.0; hint.anchor_right = 1.0
 	hint.anchor_top  = 1.0; hint.anchor_bottom = 1.0
 	hint.offset_left = -24; hint.offset_right = -60
-	hint.offset_top  = -24; hint.offset_bottom = -40
+	hint.offset_top  = -24; hint.offset_bottom = -10
 	hint.visible = false
 	hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hint.z_index = 220
