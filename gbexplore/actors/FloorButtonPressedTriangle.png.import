@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://jroqciscx1en"
-path="res://.godot/imported/windmill.png-9aa1e7e2f9d355413ced70254d1792ad.ctex"
+uid="uid://dixey3ly3ho3e"
+path="res://.godot/imported/FloorButtonPressedTriangle.png-4f63603096e6514c9db6f15ae83607f1.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://art/windmill.png"
-dest_files=["res://.godot/imported/windmill.png-9aa1e7e2f9d355413ced70254d1792ad.ctex"]
+source_file="res://actors/FloorButtonPressedTriangle.png"
+dest_files=["res://.godot/imported/FloorButtonPressedTriangle.png-4f63603096e6514c9db6f15ae83607f1.ctex"]
 
 [params]
 

@@ -394,9 +394,6 @@ var ROOM_DEFS := [
 		"exits":      {"N": true, "E": true, "S": true, "W": true},
 		"entry_open": {"N": true, "E": true, "S": true, "W": true},
 		"weight": 4,
-		"pickups": [
-			{"x": 4, "y": 4, "item_id": "shrimp", "amount": 1, "uid": "shrimp"}
-		],
 		"unique": true
 	},
 	{
@@ -581,6 +578,9 @@ var ROOM_DEFS := [
 		"exits":      {"N": false, "E": true, "S": false, "W": false},
 		"entry_open": {"N": false, "E": true, "S": false, "W": false},
 		"weight": 2,
+		"chests": [
+			{ "tile": Vector2i(4, 4), "item_id": "book", "amount": 1, "uid": "cave_chest_1" }
+		],
 		"unique": true
 	},
 	{
@@ -604,6 +604,9 @@ var ROOM_DEFS := [
 		"exits":        {"N": true, "E": true, "S": false, "W": true},
 		"entry_open":   {"N": true, "E": true, "S": false, "W": true},
 		"weight": 3,
+		"pickups": [
+			{"x": 2, "y": 5, "item_id": "shrimp", "amount": 1, "uid": "beach_shrimp"}
+		],
 		"unique": false
 	},
 	{

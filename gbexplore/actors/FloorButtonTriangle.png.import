@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://5ptt10wuqeek"
-path="res://.godot/imported/overworld-tiles1.png-db7f1a4fe1453666fc4f0a30667bc343.ctex"
+uid="uid://cr87dac5gmn28"
+path="res://.godot/imported/FloorButtonTriangle.png-a2b1c8a7dc3647b016a5f919c43a7e8a.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://art/overworld-tiles1.png"
-dest_files=["res://.godot/imported/overworld-tiles1.png-db7f1a4fe1453666fc4f0a30667bc343.ctex"]
+source_file="res://actors/FloorButtonTriangle.png"
+dest_files=["res://.godot/imported/FloorButtonTriangle.png-a2b1c8a7dc3647b016a5f919c43a7e8a.ctex"]
 
 [params]
 
