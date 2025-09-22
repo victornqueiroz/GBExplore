@@ -234,6 +234,7 @@ func _edge_constrained_candidates(base: Array, nx: int, ny: int) -> Array:
 	var filtered: Array = []
 	var forbid_beach := (ny != GRID_H - 1)
 	var forbid_mountain := (ny != 0)
+	var forbid_crossing := ((ny == GRID_H - 1) || (ny == 0))
 
 	for def in base:
 		if typeof(def) != TYPE_DICTIONARY:
@@ -246,6 +247,8 @@ func _edge_constrained_candidates(base: Array, nx: int, ny: int) -> Array:
 		if forbid_beach and _has_kind(def, "beach"):
 			continue
 		if forbid_mountain and _has_kind(def, "mountain"):
+			continue
+		if forbid_crossing and _has_kind(def, "crossing"):
 			continue
 
 		filtered.append(def)

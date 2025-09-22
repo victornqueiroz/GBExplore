@@ -741,6 +741,7 @@ var ROOM_DEFS := [
 		"entry_open":   {"N": false, "E": false, "S": true, "W": false},
 		"allowed_entry": ["S"],
 		"weight": 3,
+		"draftable": false,
 		"unique": true
 	},
 	{
@@ -754,7 +755,7 @@ var ROOM_DEFS := [
 		"npcs": [
 			{
 				"sprite": "res://npc/signpost.png",
-				"tile": Vector2i(5, 5),
+				"tile": Vector2i(5, 6),
 				"lines": ["After the sun goes down, the moon shines on the mountains"],
 			}
 		],
