@@ -2,7 +2,7 @@ extends Node
 # Autoloaded as "RunState" (no class_name here)
 
 # ---------------- Config ----------------
-const START_STEPS := 30 #30
+const START_STEPS := 50 #30
 
 # Canonical world size (keep this in sync with ScreenManager or reference it from there)
 const GRID_W := 8
@@ -374,6 +374,9 @@ var ROOM_DEFS := [
 		"exits":      {"N": false, "E": true, "S": false, "W": true},
 		"entry_open": {"N": false, "E": true, "S": false, "W": true},
 		"weight": 4,
+		"chests": [
+			{ "tile": Vector2i(4, 1), "item_id": "shell", "amount": 1, "uid": "windmill_chest_1" }
+		],
 		"unique": true
 	},
 	{
@@ -388,13 +391,13 @@ var ROOM_DEFS := [
 	},
 	{
 		"path": "res://rooms/room_forest2.tscn",
-		"name": "Forest 2",
+		"name": "Crossing",
 		"type": "forest",
 		"tags": ["land","forest"],
 		"exits":      {"N": true, "E": true, "S": true, "W": true},
 		"entry_open": {"N": true, "E": true, "S": true, "W": true},
-		"weight": 4,
-		"unique": true
+		"weight": 3,
+		"unique": false,
 	},
 	{
 		"path": "res://rooms/room_puzzle_triangle_forest.tscn",
@@ -418,6 +421,13 @@ var ROOM_DEFS := [
 		"exits":      {"N": false, "E": true, "S": true, "W": true},
 		"entry_open": {"N": false, "E": true, "S": true, "W": true},
 		"weight": 3,
+		"npcs": [
+			{
+				"sprite": "res://npc/signpost.png",
+				"tile": Vector2i(4, 3),
+				"lines": ["Some areas can only be found if you are coming from a certain direction."],
+			}
+		],
 		"unique": true
 	},
 	{
@@ -428,7 +438,7 @@ var ROOM_DEFS := [
 		"exits":      {"N": true, "E": true, "S": true, "W": false},
 		"entry_open": {"N": true, "E": true, "S": true, "W": false},
 		"weight": 3,
-		"unique": true
+		"unique": false,
 	},
 	{
 		"path": "res://rooms/room_path2.tscn",
@@ -488,10 +498,14 @@ var ROOM_DEFS := [
 					"item_id": "book",
 					"amount": 1,
 					"uid": "girl_book_01",
-					"lines_before": ["Have you seen my book?"],
-					"lines_on_give": ["Oh! You found it—thank you! Take this shrimp as a reward. My dad will tell you more about it."],
-					"lines_after": ["I'm busy reading now!"],
-					"reward": {"item_id": "shrimp", "amount": 1}
+					"lines_before": 
+						[
+							"Oh, there you are again!",
+							"I still couldn't find my book. If you find it please bring it to me."
+						],
+					"lines_on_give": ["Oh! You found it—thank you! Take this Flower I found earlier. Doesn't it look pretty?"],
+					"lines_after": ["Thank you for finding my book!"],
+					"reward": {"item_id": "flower", "amount": 1}
 				}
 			}
 		]
@@ -529,13 +543,12 @@ var ROOM_DEFS := [
 							"What? You didn't know about the SHIFTING? HAHAHA",
 							"Well... this has started a few years ago and no one knows why.",
 							"The whole island shifts every few days and there's nothing we can do about it.",
-							"I've been trying to map it out but I haven't gotten far, unfortunately",
-							"For now I just gotta keep my daughter fed",
 							"By the way... do you have any Shrimp I could use as a bait?"
 					],
-					"lines_on_give": ["You found a Shrimp! AMAZING!", "Thank you!!!"],
-					"lines_after": ["Now I will be able to catch something good!"],
-					"reward": {"item_id": "book", "amount": 1}
+					"lines_on_give": ["You found a Shrimp! AMAZING!", "Thank you!!!",
+					"For some reason, forests are created after the oceans when the island is reshaped."],
+					"lines_after": ["For some reason, forests are created after the oceans when the island is reshaped."],
+					#"reward": {"item_id": "book", "amount": 1}
 				}
 			}
 		]
@@ -548,7 +561,33 @@ var ROOM_DEFS := [
 		"exits":      {"N": false, "E": false, "S": true, "W": false},
 		"entry_open": {"N": false, "E": false, "S": true, "W": false},
 		"weight": 2,
-		"unique": true
+		"unique": true,
+		"npcs": [
+			{
+				"sprite": "res://npc/witch.png",
+				"tile": Vector2i(4, 4),
+				"lines": ["i Hola !"],
+				"need": {
+					"item_id": "necklace",
+					"amount": 1,
+					"uid": "necklace_witch_01",
+					"lines_before": 
+						[
+							"i Hola !",
+							"Strange things happen in this island. Areas move to different locations and items disappear.",
+							"I can't find my precious necklace. I wonder if it is because of the shifting or if someone stole it from my house while I was away.",
+					],
+					"lines_on_give": ["So you were the thief!!",
+										"Hahaha! Just kidding! Muchas gracias.",
+					"A mysterious person visited me once looking for a map.",
+					"After that I've never seen him again.",
+					"I believe the answers can be found inside the Hidden Tower.",
+					],
+					"lines_after": ["I believe the answers can be found inside the Hidden Tower."],
+					#"reward": {"item_id": "book", "amount": 1}
+				}
+			}
+		]
 	},
 	{
 		"path": "res://rooms/room_farmer.tscn",
@@ -558,7 +597,39 @@ var ROOM_DEFS := [
 		"exits":      {"N": true, "E": false, "S": false, "W": true},
 		"entry_open": {"N": true, "E": false, "S": false, "W": true},
 		"weight": 2,
-		"unique": true
+		"npcs": [
+			{
+				"sprite": "res://npc/farmer.png",
+				"tile": Vector2i(5,3),
+				"lines": ["",],
+				"need": {
+					"item_id": "flower",
+					"amount": 1,
+					"uid": "farmer_flower_01",
+					"lines_before": 
+						[
+							"This island has some really interesting plants.",
+							"I moved here in search of a special flower called White Princess, but soon after the ground started shifting and I got stuck."
+						],
+					"lines_on_give": ["You found the White Princess?! Thank you so much!!",
+					"I don't know how to repay you for this but if you are trying to enter the Hidden Tower, I've heard that you need to press all three triangle buttons on the island before the ground shifts. I doubt that is possible, but that's all I know."],
+					"lines_after": ["I've heard that you need to press all three triangle buttons on the island before the ground shifts. I doubt that is possible, but that's all I know."
+					],
+					"reward": {"item_id": "flower", "amount": 1}
+					}
+			},
+			{
+				"sprite": "res://npc/signpost.png",
+				"tile": Vector2i(5, 1),
+				"lines": ["  ^   Mountain",
+				"<   Lake",
+							"(This sign was placed here before the shifting started happening. It might not be accurate anymore.)",
+						],
+			}
+		],
+		
+		"unique": true,
+		
 	},
 	{
 		"path": "res://rooms/room_farm2.tscn",
@@ -568,7 +639,14 @@ var ROOM_DEFS := [
 		"exits":      {"N": true, "E": false, "S": false, "W": true},
 		"entry_open": {"N": true, "E": false, "S": false, "W": true},
 		"weight": 2,
-		"unique": true
+		"npcs": [
+			{
+				"sprite": "res://npc/signpost.png",
+				"tile": Vector2i(5, 4),
+				"lines": ["On the top of the island you can see the mountains, and on the bottom you can find the beach."],
+			}
+		],
+		"unique": true,
 	},
 	{
 		"path": "res://rooms/room_cave.tscn",
@@ -586,13 +664,13 @@ var ROOM_DEFS := [
 	{
 		"path": "res://rooms/room_rocky.tscn",
 		"name": "Rocky",
-		"type": "mountain",
-		"tags": ["land","mountain"],
+		"type": "rocky",
+		"tags": ["land"],
 		"exits":      {"N": true, "E": true, "S": true, "W": true},
 		"entry_open": {"N": true, "E": true, "S": true, "W": true},
-		"weight": 2,
+		"weight": 4,
 		"chests": [
-			{ "tile": Vector2i(4, 1), "item_id": "shrimp", "amount": 1, "uid": "hut_chest_1" }
+			{ "tile": Vector2i(4, 1), "item_id": "necklace", "amount": 1, "uid": "rocky_chest_1" }
 		],
 		"unique": true
 	},
@@ -633,12 +711,20 @@ var ROOM_DEFS := [
 			{
 				"sprite": "res://npc/mermaid.png",
 				"tile": Vector2i(5, 5),
-				"lines": [
-					"嗨，陌生人！",
-					"我要返屋企，但我唔識游水。",
-					"如果我有一條魔鬼魚，我就可以騎住佢⋯"
-				],
-				
+				"lines": ["Hi!"],
+				"need": {
+					"item_id": "shell",
+					"amount": 1,
+					"uid": "mermaid_shell_01",
+					"lines_before": 
+						[
+							"No need to be scared, this is just a costume!",
+							"I wanted to be a mermaid so I can escape this island, but I'm too scared to swim."
+						],
+					"lines_on_give": ["I've been trying to find this Shell for so long. I wonder how it ended up there.", "There is a message written on it. 'The ocean always comes first when the island reshapes.'"],
+					"lines_after": ["There is a message written on it. 'The ocean always comes first when the island reshapes.'"],
+					#"reward": {"item_id": "flower", "amount": 1}
+				}
 			}
 		],
 		"exits":        {"N": true, "E": true, "S": false, "W": true},
@@ -665,6 +751,13 @@ var ROOM_DEFS := [
 		"exits":        {"N": false, "E": false, "S": true, "W": false},
 		"entry_open":   {"N": false, "E": false, "S": true, "W": false},
 		"allowed_entry": ["S"],
+		"npcs": [
+			{
+				"sprite": "res://npc/signpost.png",
+				"tile": Vector2i(5, 5),
+				"lines": ["After the sun goes down, the moon shines on the mountains"],
+			}
+		],
 		"weight": 3,
 		"unique": true
 	},

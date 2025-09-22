@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bug7xess731g6"
-path="res://.godot/imported/FloorButtonPressedTriangle.png-4f63603096e6514c9db6f15ae83607f1.ctex"
+uid="uid://dffg14clmv5wx"
+path="res://.godot/imported/necklace.png-6ad15c9229e737ab222436b5bade7faf.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://actors/FloorButtonPressedTriangle.png"
-dest_files=["res://.godot/imported/FloorButtonPressedTriangle.png-4f63603096e6514c9db6f15ae83607f1.ctex"]
+source_file="res://items/necklace.png"
+dest_files=["res://.godot/imported/necklace.png-6ad15c9229e737ab222436b5bade7faf.ctex"]
 
 [params]
 

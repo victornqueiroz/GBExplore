@@ -6,7 +6,7 @@
 [resource]
 script = ExtResource("2_53mq3")
 id = "map"
-display_name = "map"
+display_name = "Map"
 icon = ExtResource("1_ay4o1")
 description = "A strange map."
 stackable = false

@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="ItemData" load_steps=3 format=3 uid="uid://dtoqei2cmbkoj"]
+
+[ext_resource type="Texture2D" uid="uid://dffg14clmv5wx" path="res://items/necklace.png" id="1_rjhj1"]
+[ext_resource type="Script" uid="uid://bid2jph5r7dp8" path="res://items/ItemData.gd" id="2_cshji"]
+
+[resource]
+script = ExtResource("2_cshji")
+id = "necklace"
+display_name = "Necklace"
+icon = ExtResource("1_rjhj1")
+description = "A unique necklace"
+stackable = false
+metadata/_custom_type_script = "uid://bid2jph5r7dp8"

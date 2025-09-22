@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="ItemData" load_steps=3 format=3 uid="uid://b17msmmj7h2"]
+
+[ext_resource type="Texture2D" uid="uid://bkj5pv0dmfa6u" path="res://items/flower.png" id="1_vbqhv"]
+[ext_resource type="Script" uid="uid://bid2jph5r7dp8" path="res://items/ItemData.gd" id="2_jr4s7"]
+
+[resource]
+script = ExtResource("2_jr4s7")
+id = "flower"
+display_name = "Flower"
+icon = ExtResource("1_vbqhv")
+description = "A special flower"
+stackable = false
+metadata/_custom_type_script = "uid://bid2jph5r7dp8"

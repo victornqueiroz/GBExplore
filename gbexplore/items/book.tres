@@ -6,7 +6,7 @@
 [resource]
 script = ExtResource("2_2nvir")
 id = "book"
-display_name = "book"
+display_name = "Book"
 icon = ExtResource("1_ups48")
 description = "A strange book."
 stackable = false

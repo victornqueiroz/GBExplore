@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bug7xess731g6"
-path="res://.godot/imported/FloorButtonPressedTriangle.png-4f63603096e6514c9db6f15ae83607f1.ctex"
+uid="uid://ddd8f3cxbcwpe"
+path="res://.godot/imported/shell.png-b83957669bfd1bb488dc531421cc8968.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://actors/FloorButtonPressedTriangle.png"
-dest_files=["res://.godot/imported/FloorButtonPressedTriangle.png-4f63603096e6514c9db6f15ae83607f1.ctex"]
+source_file="res://items/shell.png"
+dest_files=["res://.godot/imported/shell.png-b83957669bfd1bb488dc531421cc8968.ctex"]
 
 [params]
 
