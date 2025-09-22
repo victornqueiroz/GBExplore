@@ -68,6 +68,9 @@ var candidate_defs: Array = []
 var _menu_index: int = 0
 var is_transitioning: bool = false	# only suppresses edge checks; player keeps moving
 
+var _use_manual_spawn: bool = false
+var _next_manual_spawn: Vector2 = Vector2.ZERO
+
 func request_player_sleep() -> void:
 	# Any pre-sleep SFX / analytics hooks can go here later.
 	_game_over()
@@ -320,7 +323,7 @@ func _perform_transition(next_coord: Vector2i, path: String) -> void:
 func _do_room_swap(next_coord: Vector2i, path: String) -> void:
 	_clear_room()
 
-	# --- exact center of the middle tile on the opposite edge (9x9, 16px) ---
+	# --- default spawn: center of middle tile on the appropriate edge ---
 	var mid_col := (MAP_W - 1) / 2
 	var mid_row := (MAP_H - 1) / 2
 	var spawn := Vector2(SCREEN_SIZE.x / 2.0, SCREEN_SIZE.y / 2.0)
@@ -333,6 +336,11 @@ func _do_room_swap(next_coord: Vector2i, path: String) -> void:
 		spawn = Vector2((mid_col + 0.5) * TILE, (MAP_H - 1 + 0.5) * TILE)
 	elif pending_dir == Vector2i(0, 1):
 		spawn = Vector2((mid_col + 0.5) * TILE, (0 + 0.5) * TILE)
+
+	# --- override with manually defined spawn (from door teleport, etc) ---
+	if _use_manual_spawn:
+		spawn = _next_manual_spawn
+		_use_manual_spawn = false
 
 	# Load and add the new room
 	var ps := load(path)
@@ -348,38 +356,34 @@ func _do_room_swap(next_coord: Vector2i, path: String) -> void:
 	if USE_EDGE_BLOCKERS:
 		_apply_edge_blockers(room, path, next_coord)
 
-	# --- NEW: spawn props (campfire, etc.) ---
+	# --- Props + game objects ---
 	var def := RunState.get_def_by_path(path)
 	_spawn_room_props(room, def)
-
-	# --- NPCs, chests, pickups ---
 	_spawn_npcs(room, path)
 	_spawn_chests(room, path)
 	_spawn_pickups(room, path)
-	_spawn_buttons(room, path) 
-	
+	_spawn_buttons(room, path)
+
 	var puzzle = room.get_node_or_null("AltairPuzzle")
 	if puzzle and puzzle.has_method("connect_buttons"):
 		puzzle.connect_buttons()
 
-	# Update run state + spawn player
+	# Update run state + move player
 	RunState.pos = next_coord
 	player.position = spawn
 
-	# Close choice UI if still open
+	# UI cleanup
 	if choice_panel.visible:
 		_close_choice_panel()
 
-	# Steps/HUD
 	RunState.steps_left -= 1
 	_update_hud()
+
 	if RunState.steps_left <= 0:
 		_game_over()
 
-	# Map overlay refresh
 	if map_overlay and map_overlay.visible:
 		map_overlay.refresh()
-
 # -------------------------------
 # HUD / basic helpers
 # -------------------------------
@@ -1182,3 +1186,18 @@ func _spawn_prop_campfire(room: Node, p: Dictionary) -> void:
 	node.position = px + off
 
 	room.add_child(node)
+
+
+# Teleport into an arbitrary room (keep the same grid coord).
+# Teleport into a room and optionally spawn at a specific tile.
+func enter_room_direct(target_path: String, spawn_tile: Vector2i = Vector2i(-1, -1)) -> void:
+	if target_path == "" or is_transitioning:
+		return
+	pending_dir = Vector2i.ZERO  # center-entry semantics
+
+	# If caller provided a tile, convert to pixels and mark for use in _do_room_swap
+	if spawn_tile.x >= 0 and spawn_tile.y >= 0:
+		_use_manual_spawn = true
+		_next_manual_spawn = Vector2((spawn_tile.x + 0.5) * TILE, (spawn_tile.y + 0.5) * TILE)
+
+	_perform_transition(RunState.pos, target_path)
