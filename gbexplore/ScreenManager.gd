@@ -71,6 +71,7 @@ var is_transitioning: bool = false	# only suppresses edge checks; player keeps m
 var _use_manual_spawn: bool = false
 var _next_manual_spawn: Vector2 = Vector2.ZERO
 
+
 # One-off edge override for the CURRENT room: side ("N","E","S","W") -> {path, spawn_tile: Vector2i}
 var _edge_return: Dictionary = {}
 
@@ -85,22 +86,34 @@ func _show_edge_walls() -> bool:
 	return GameConfig.DEV_MODE and GameConfig.SHOW_EDGE_WALLS
 
 func _ready() -> void:
+	print("SM: _ready begin")
+	is_transitioning = true                 # <- block edge checks during boot
+
+	await get_tree().process_frame          # (optional) let autoloads settle
+
+	# Play intro first
+	await _play_intro_cutscene()
+	print("SM: intro finished")
+
 	add_to_group("screen_manager")
 	ROCK_LAYER = GameConfig.WALL_LAYER
-	ROCK_MASK = GameConfig.WALL_MASK
-	print("Has /root/ItemDb? ", has_node("/root/ItemDb"))
-
-	# make sure the fade overlay starts fully transparent
+	ROCK_MASK  = GameConfig.WALL_MASK
 	_fade_reset_to_clear()
 
+	# Load start room and place player
 	#_load_room_at(RunState.pos, "res://rooms/tutorial_start.tscn")
 	_load_room_at(RunState.pos, "res://rooms/room_start.tscn")
 	player.position = Vector2(SCREEN_SIZE.x / 2.0 + 16, SCREEN_SIZE.y / 2.0)
+
 	_update_hud()
 	_close_choice_panel()
 
 	for i in range(option_buttons.size()):
 		option_buttons[i].pressed.connect(_on_option_pressed.bind(i))
+
+	is_transitioning = false                # <- allow edge checks now
+	print("SM: _ready end")
+
 
 func _physics_process(_delta: float) -> void:
 	if choice_panel.visible:
@@ -1248,3 +1261,87 @@ func _exit_side_for_dir_current(dir: Vector2i) -> String:
 	if dir == Vector2i(0, -1): return "N"
 	if dir == Vector2i(0, 1):  return "S"
 	return "?"
+
+
+func _play_intro_cutscene() -> void:
+	var overlay := preload("res://ui/CinematicOverlay.tscn").instantiate()
+	overlay.process_mode = Node.PROCESS_MODE_WHEN_PAUSED
+	overlay.layer = 1000
+	get_tree().root.add_child(overlay)
+
+	if not overlay.is_node_ready():
+		await overlay.ready
+
+	# Kick off playback (don't await here)
+	overlay.play_images([
+		"res://cinematic/intro/intro_01.png",
+		"res://cinematic/intro/intro_02.png",
+		"res://cinematic/intro/intro_03.png",
+		"res://cinematic/intro/intro_04.png",
+	], 1.5, 0.5, 0.0, 0.5, true, true, 0.35)
+
+	# Wait for either normal end or skip
+	await overlay.finished
+# Puzzle solved entry point (call this from triangle/square when they finish)
+func notify_puzzle_solved(key: String) -> void:
+	# mark solved
+	if key == "triangle":
+		RunState.triangle_solved = true
+	elif key == "square":
+		RunState.square_solved = true
+
+	# if the OTHER puzzle is already solved -> play the combined cutscene (once)
+	var other_done := (key == "triangle") and RunState.square_solved \
+		or (key == "square") and RunState.triangle_solved
+
+	if other_done and not RunState.both_cutscene_played:
+		RunState.both_cutscene_played = true
+		await _play_cutscene_for("both")
+		return
+
+	# otherwise this is the first of the two → play the individual cutscene once
+	match key:
+		"triangle":
+			if not RunState.triangle_cutscene_played:
+				RunState.triangle_cutscene_played = true
+				await _play_cutscene_for("triangle")
+		"square":
+			if not RunState.square_cutscene_played:
+				RunState.square_cutscene_played = true
+				await _play_cutscene_for("square")
+				
+func _play_cutscene_for(key: String) -> void:
+	var overlay := preload("res://ui/CinematicOverlay.tscn").instantiate()
+	overlay.process_mode = Node.PROCESS_MODE_WHEN_PAUSED
+	overlay.layer = 1000
+	get_tree().root.add_child(overlay)
+
+	if not overlay.is_node_ready():
+		await overlay.ready
+
+	var frames: Array[String] = []
+
+	match key:
+		"triangle":
+			frames = [
+				"res://cinematic/hiddentower/default01.png",
+				"res://cinematic/hiddentower/default.png",
+				"res://cinematic/hiddentower/triangle01.png",
+			]
+		"square":
+			frames = [
+				"res://cinematic/hiddentower/default01.png",
+				"res://cinematic/hiddentower/default.png",
+				"res://cinematic/hiddentower/square01.png",
+			]
+		"both":
+			frames = [
+				"res://cinematic/hiddentower/default01.png",
+				"res://cinematic/hiddentower/both01.png",
+				"res://cinematic/hiddentower/both02.png",
+			]
+		_:
+			return # unknown key
+
+	await overlay.play_images(frames, 1.0, 0.2, 0.0, 0.2, false, true, 0.35)
+	await overlay.finished

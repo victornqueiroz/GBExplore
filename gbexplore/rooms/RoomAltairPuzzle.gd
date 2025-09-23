@@ -107,15 +107,23 @@ func _on_solved() -> void:
 		_solved_once = true
 		if RunState.button_group_count(GROUP_KEY) < 1:
 			RunState.button_group_add(GROUP_KEY, +1)
-	# Keep plates down as success confirmation
+
+	# (existing cleanup)
 	_clear_tracking_only()
-	# If we were waiting to reset on exit for some reason, cancel it
 	_pending_reset = false
 	if _last_pressed_button and _last_pressed_button.body_exited.is_connected(_on_last_plate_body_exited):
 		_last_pressed_button.body_exited.disconnect(_on_last_plate_body_exited)
 	_last_pressed_button = null
 	_last_pressed_idx = -1
 
+	# NEW: notify ScreenManager
+	if not RunState.square_solved:
+		RunState.square_solved = true
+	var sm := get_tree().get_first_node_in_group("screen_manager")
+	if sm and sm.has_method("notify_puzzle_solved"):
+		await sm.notify_puzzle_solved("square")
+		
+		
 func _reset_buttons() -> void:
 	# Raise all pressed plates this attempt
 	for idx in _pressed_order:
@@ -127,3 +135,8 @@ func _reset_buttons() -> void:
 func _clear_tracking_only() -> void:
 	_pressed_order.clear()
 	_pressed_set.clear()
+
+func _play_square_cutscene() -> void:
+	var sm := get_tree().get_first_node_in_group("screen_manager")
+	if sm and sm.has_method("_play_cutscene_for"):
+		await sm._play_cutscene_for("square")

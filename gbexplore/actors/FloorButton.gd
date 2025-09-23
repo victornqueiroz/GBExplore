@@ -61,6 +61,8 @@ func _on_body_entered(body: Node) -> void:
 		if button_key == "triangle":
 			if Engine.has_singleton("SoundManager"):
 				Engine.get_singleton("SoundManager").play("ding_triangle")
+			# 🔽 NEW: trigger the cutscene when all triangle plates are down
+			await _maybe_play_triangle_cutscene()
 
 	if one_shot:
 		_already_triggered = true
@@ -131,3 +133,12 @@ func deactivate() -> void:
 			RunState.button_group_add(button_key, -1)
 	_apply_state(false)
 	_already_triggered = false
+
+func _maybe_play_triangle_cutscene() -> void:
+	# Target count = 3 (change if different)
+	if RunState.button_group_count("triangle") >= 3:
+		if not RunState.triangle_solved:
+			RunState.triangle_solved = true
+			var sm := get_tree().get_first_node_in_group("screen_manager")
+			if sm and sm.has_method("notify_puzzle_solved"):
+				await sm.notify_puzzle_solved("triangle")

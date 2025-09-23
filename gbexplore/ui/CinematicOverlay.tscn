@@ -1,0 +1,53 @@
+[gd_scene load_steps=2 format=3 uid="uid://ninxxe86fjjd"]
+
+[ext_resource type="Script" uid="uid://bqgpngd1vn84c" path="res://ui/CinematicOverlay.gd" id="1_285wl"]
+
+[node name="CinematicOverlay" type="CanvasLayer"]
+process_mode = 2
+layer = 100
+script = ExtResource("1_285wl")
+
+[node name="Overlay" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+focus_mode = 2
+
+[node name="Backdrop" type="ColorRect" parent="Overlay"]
+layout_mode = 0
+offset_right = 144.0
+offset_bottom = 144.0
+color = Color(0, 0, 0, 1)
+
+[node name="Fade" type="ColorRect" parent="Overlay"]
+layout_mode = 0
+offset_right = 40.0
+offset_bottom = 40.0
+
+[node name="FrameA" type="TextureRect" parent="Overlay"]
+z_index = 1
+texture_filter = 1
+texture_repeat = 1
+layout_mode = 0
+offset_right = 40.0
+offset_bottom = 40.0
+stretch_mode = 6
+
+[node name="FrameB" type="TextureRect" parent="Overlay"]
+modulate = Color(1, 1, 1, 0)
+z_index = 1
+texture_filter = 1
+texture_repeat = 1
+layout_mode = 0
+offset_right = 40.0
+offset_bottom = 40.0
+stretch_mode = 6
+
+[node name="SkipHint" type="Label" parent="Overlay"]
+visible = false
+layout_mode = 0
+offset_right = 40.0
+offset_bottom = 23.0

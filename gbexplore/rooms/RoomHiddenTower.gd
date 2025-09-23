@@ -36,8 +36,8 @@ var _door_open := false
 var _door_trigger: Area2D = null
 
 func _ready() -> void:
-	RunState.button_group_add("triangle", 3)
-	RunState.button_group_add("square", 1)
+	#RunState.button_group_add("triangle", 3)
+	#RunState.button_group_add("square", 1)
 	for key in _icons.keys():
 		_apply_icon(key, _is_key_lit(key))
 	_update_door_now()

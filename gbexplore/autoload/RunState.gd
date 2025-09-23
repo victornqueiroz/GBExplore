@@ -2,7 +2,7 @@ extends Node
 # Autoloaded as "RunState" (no class_name here)
 
 # ---------------- Config ----------------
-const START_STEPS := 50 #30
+const START_STEPS := 40 #30
 
 # Canonical world size (keep this in sync with ScreenManager or reference it from there)
 const GRID_W := 8
@@ -23,8 +23,17 @@ func get_start_room_path() -> String:
 var _dest_marker_enabled: bool = false
 var _dest_marker_coord: Vector2i = Vector2i(0, 0)
 
+
+#cutscenes
+var triangle_solved: bool = false
+var square_solved: bool = false
+
+var triangle_cutscene_played: bool = false
+var square_cutscene_played: bool = false
+var both_cutscene_played: bool = false
+
 # With an even grid, there are 4 “central” tiles; we’ll pick (4,4)
-const START_POS := Vector2i(1,1)   # -> (4, 4)
+const START_POS := Vector2i(4,4)   # -> (4, 4)
 
 # The trade UID in tutorial_hut that should force steps to 1 after trade completes
 const TUTORIAL_FISHER_TRADE_UID := "tut_fisherman_book"
@@ -313,9 +322,11 @@ var ROOM_DEFS := [
 						"I've never seen anything like it.",
 						"LOOK!!!",
 						"There's a marked spot here! Could that be the location of the Hidden Tower?!",
-						"You should go check it out before the ground starts shifting again!"
+						"You should go check it out before the ground starts shifting again!",
+						"(Press M to view the map.)"
 					],
-					"lines_after":[ "You should go find the Hidden Tower before the ground starts shifting again!" ]
+					"lines_after":[ "You should go find the Hidden Tower before the ground starts shifting again!",
+					"(Press M to view the map.)" ]
 				},
 			}
 		]
