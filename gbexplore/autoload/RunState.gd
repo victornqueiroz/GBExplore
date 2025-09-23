@@ -649,6 +649,25 @@ var ROOM_DEFS := [
 		"unique": true,
 	},
 	{
+		"path": "res://rooms/room_inside_tower.tscn",
+		"name": "Inside",
+		"type": "land",
+		"tags": ["land"],
+		"exits":      {"N": false, "E": false, "S": true, "W": false},
+		"entry_open": {"N": false, "E": false, "S": true, "W": false},
+		"weight": 2,
+		"npcs": [
+			{
+				"sprite": "res://npc/diary.png",
+				"tile": Vector2i(4, 3),
+				"lines": ["When you read this, I won't be here anymore. Maybe I'll catch you in another loop.",
+				"Thank you for playing!"],
+			}
+		],
+		"draftable": false,
+		"unique": true,
+	},
+	{
 		"path": "res://rooms/room_cave.tscn",
 		"name": "Cave",
 		"type": "cave",
