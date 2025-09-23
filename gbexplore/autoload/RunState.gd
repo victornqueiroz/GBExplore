@@ -756,7 +756,7 @@ var ROOM_DEFS := [
 			{
 				"sprite": "res://npc/signpost.png",
 				"tile": Vector2i(5, 6),
-				"lines": ["After the sun goes down, the moon shines on the mountains"],
+				"lines": ["After the sun goes down, the moon shines on the mountains."],
 			}
 		],
 		"weight": 3,

@@ -71,6 +71,9 @@ var is_transitioning: bool = false	# only suppresses edge checks; player keeps m
 var _use_manual_spawn: bool = false
 var _next_manual_spawn: Vector2 = Vector2.ZERO
 
+# One-off edge override for the CURRENT room: side ("N","E","S","W") -> {path, spawn_tile: Vector2i}
+var _edge_return: Dictionary = {}
+
 func request_player_sleep() -> void:
 	# Any pre-sleep SFX / analytics hooks can go here later.
 	_game_over()
@@ -139,6 +142,32 @@ func _propose_transition(dir: Vector2i) -> void:
 	if choice_panel.visible or is_transitioning:
 		return
 
+	# ---------- One-off edge override (exit side of the CURRENT room) ----------
+	var exit_side := _exit_side_for_dir_current(dir)  # "N","E","S","W" of current room
+	if _edge_return.has(exit_side):
+		var data: Dictionary = _edge_return[exit_side]
+		_edge_return.clear()  # consume it (one-shot)
+
+		pending_dir = Vector2i.ZERO  # center-entry semantics on teleport swap (same cell)
+
+		# Target path for the override (the room we want to swap into)
+		var path_over := String(data.get("path", ""))
+		if path_over == "":
+			return
+
+		# Optional manual spawn (tile coords) inside the target room
+		if data.has("spawn_tile"):
+			var st: Vector2i = data["spawn_tile"]
+			if st.x >= 0 and st.y >= 0:
+				_use_manual_spawn = true
+				_next_manual_spawn = Vector2((st.x + 0.5) * TILE, (st.y + 0.5) * TILE)
+
+		# IMPORTANT: do NOT move to a neighbor cell; stay at the same grid coord
+		_perform_transition(RunState.pos, path_over)
+		return
+	# ---------- /edge override ----------
+
+	# (unchanged regular world-edge handling below)
 	pending_dir = dir
 	var next := RunState.pos + dir
 
@@ -162,9 +191,6 @@ func _propose_transition(dir: Vector2i) -> void:
 			_refresh_edge_rocks_for_current_room()
 		return
 
-	# already set above:
-# var next := RunState.pos + dir
-
 	# New destination: pick candidates
 	var entry_side := _entry_side_for_dir(dir)
 	var base_candidates: Array = RunState.pick_room_candidates(entry_side, 12)
@@ -175,14 +201,14 @@ func _propose_transition(dir: Vector2i) -> void:
 		if not RunState.used_unique.has(tower_path):
 			var tower_def := RunState.get_def_by_path(tower_path)
 			if tower_def.size() > 0:
-				# remove if already present (just in case), then put it first
 				base_candidates = base_candidates.filter(func(d): return String(d.get("path","")) != tower_path)
 				base_candidates.push_front(tower_def)
 
-	# then continue with your existing edge constraints using `next`
+	# Apply edge constraints
 	var nx := next.x
 	var ny := next.y
 	candidate_defs = _edge_constrained_candidates(base_candidates, nx, ny)
+
 	# Prepare UI text
 	for i in range(option_buttons.size()):
 		if i < candidate_defs.size():
@@ -206,7 +232,6 @@ func _propose_transition(dir: Vector2i) -> void:
 		return
 
 	_open_choice_panel()
-
 # Southmost row → only "beach"; Leftmost col → only "path"
 # --- kind helper used by edge constraints ---
 func _has_kind(def: Dictionary, kind: String) -> bool:
@@ -1187,17 +1212,39 @@ func _spawn_prop_campfire(room: Node, p: Dictionary) -> void:
 
 	room.add_child(node)
 
-
-# Teleport into an arbitrary room (keep the same grid coord).
-# Teleport into a room and optionally spawn at a specific tile.
-func enter_room_direct(target_path: String, spawn_tile: Vector2i = Vector2i(-1, -1)) -> void:
+# Teleport into a room and optionally:
+# - spawn at a specific tile
+# - set a one-off edge return (e.g., when exiting "S" from the new room, go to path X and spawn at tile Y)
+func enter_room_direct(
+	target_path: String,
+	spawn_tile: Vector2i = Vector2i(-1, -1),
+	edge_return_side: String = "",
+	edge_return_target_path: String = "",
+	edge_return_spawn_tile: Vector2i = Vector2i(-1, -1)
+) -> void:
 	if target_path == "" or is_transitioning:
 		return
+
 	pending_dir = Vector2i.ZERO  # center-entry semantics
 
-	# If caller provided a tile, convert to pixels and mark for use in _do_room_swap
+	# Manual spawn override
 	if spawn_tile.x >= 0 and spawn_tile.y >= 0:
 		_use_manual_spawn = true
 		_next_manual_spawn = Vector2((spawn_tile.x + 0.5) * TILE, (spawn_tile.y + 0.5) * TILE)
 
+	# Optional one-off edge return hook for the NEXT room
+	_edge_return.clear()
+	if edge_return_side != "" and edge_return_target_path != "":
+		_edge_return[edge_return_side] = {
+			"path": edge_return_target_path,
+			"spawn_tile": edge_return_spawn_tile
+		}
+
 	_perform_transition(RunState.pos, target_path)
+
+func _exit_side_for_dir_current(dir: Vector2i) -> String:
+	if dir == Vector2i(-1, 0): return "W"
+	if dir == Vector2i(1, 0):  return "E"
+	if dir == Vector2i(0, -1): return "N"
+	if dir == Vector2i(0, 1):  return "S"
+	return "?"

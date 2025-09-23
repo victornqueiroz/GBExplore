@@ -29,7 +29,7 @@ const _LIT := {
 @export var door_alternative: int = 0
 
 # ---- ENTERING THE DOOR ----
-@export var target_room_path: String = "res://rooms/room_witch.tscn"
+@export var target_room_path: String = "res://rooms/room_inside_tower.tscn"
 @export var trigger_margin_px: int = 2
 
 var _door_open := false
@@ -138,9 +138,20 @@ func _enter_target_room() -> void:
 	if target_room_path == "":
 		return
 
-	RunState.pos = Vector2i(0, 1)  # optional: update where this room is mapped to
 	var sm := get_tree().get_first_node_in_group("screen_manager")
-	if sm and sm.has_method("enter_room_direct"):
-		sm.enter_room_direct(target_room_path, Vector2i(4, 7))  # tile coords!
-	else:
-		get_tree().change_scene_to_file(target_room_path)
+	if sm == null:
+		return
+
+	# Mark current position and teleport
+	var spawn_tile := Vector2i(4, 7)  # Where to place the player in the witch room
+	var return_tile := Vector2i(4, 4) # Where to place the player if they return from witch room
+	var exit_side := "S"              # Side the player would exit to return to the tower
+
+	# Move player and setup return logic
+	sm.enter_room_direct(
+		target_room_path,
+		spawn_tile,
+		exit_side,
+		get_scene_file_path(),  # this gets the path to room_hidden_tower.tscn
+		return_tile
+	)
