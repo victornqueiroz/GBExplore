@@ -1,0 +1,18 @@
+[gd_scene load_steps=2 format=3 uid="uid://hldy1jty4edr"]
+
+[ext_resource type="Script" uid="uid://bvxeauyh3x5ye" path="res://TileDraftPanel.gd" id="1_lmvsy"]
+
+[node name="CanvasLayer" type="CanvasLayer"]
+script = ExtResource("1_lmvsy")
+
+[node name="MarginContainer" type="MarginContainer" parent="."]
+offset_right = 40.0
+offset_bottom = 40.0
+
+[node name="Panel" type="Panel" parent="MarginContainer"]
+layout_mode = 2
+
+[node name="Row" type="HBoxContainer" parent="MarginContainer/Panel"]
+layout_mode = 0
+offset_right = 40.0
+offset_bottom = 40.0

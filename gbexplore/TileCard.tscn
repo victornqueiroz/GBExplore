@@ -1,0 +1,18 @@
+[gd_scene load_steps=2 format=3 uid="uid://dmjhvj5sex30s"]
+
+[ext_resource type="Script" uid="uid://c1ny8ar2ltss6" path="res://TileCard.gd" id="1_hamsh"]
+
+[node name="Button" type="Button"]
+offset_right = 8.0
+offset_bottom = 8.0
+script = ExtResource("1_hamsh")
+
+[node name="Thumb" type="TextureRect" parent="."]
+layout_mode = 0
+offset_right = 40.0
+offset_bottom = 40.0
+
+[node name="Name" type="Label" parent="."]
+layout_mode = 0
+offset_right = 40.0
+offset_bottom = 23.0

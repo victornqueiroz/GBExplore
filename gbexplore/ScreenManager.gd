@@ -53,14 +53,15 @@ const GAME_OVER_FADE_IN: float = 0.9
 @onready var steps_label: Label = $UI/StepsLabel
 @onready var choice_panel: PanelContainer = $UI/ChoicePanel
 @onready var option_buttons: Array[Button] = [
-	$UI/ChoicePanel/MarginContainer/VBoxContainer/Option1,
-	$UI/ChoicePanel/MarginContainer/VBoxContainer/Option2,
-	$UI/ChoicePanel/MarginContainer/VBoxContainer/Option3
+	$UI/ChoicePanel/MarginContainer/HBoxContainer/Option1,
+	$UI/ChoicePanel/MarginContainer/HBoxContainer/Option2,
+	$UI/ChoicePanel/MarginContainer/HBoxContainer/Option3
 ]
 @onready var fade_layer: CanvasLayer = $UI/FadeLayer
 @onready var fade_black: ColorRect 
 @onready var map_overlay: Control = $MapOverlay/MapRoot
 @onready var dialog_box: Control = $UI/DialogueBox
+@onready var draft_overlay: ColorRect = $UI/DraftOverlay
 
 # ----- State -----
 var pending_dir := Vector2i.ZERO
@@ -87,6 +88,28 @@ func _show_edge_walls() -> bool:
 
 func _ready() -> void:
 	print("SM: _ready begin")
+	
+	# Make option buttons behave like image tiles
+	const DRAFT_THUMB := Vector2(40, 40)  # try 80x80 or 96x96
+
+	# Row container (the HBox you just made)
+	var row := $UI/ChoicePanel/MarginContainer/HBoxContainer
+	row.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+
+	for b in option_buttons:
+		# fixed small tile
+		b.custom_minimum_size = DRAFT_THUMB
+
+		# don't stretch; keep centered
+		b.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+		b.size_flags_vertical   = Control.SIZE_SHRINK_CENTER
+
+		# image setup
+		b.text = ""
+		b.expand_icon = true                # let icon scale to button rect
+		b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		b.add_theme_constant_override("icon_max_width", int(DRAFT_THUMB.x))
+		b.add_theme_constant_override("icon_separation", 4)
 	is_transitioning = true                 # <- block edge checks during boot
 
 	await get_tree().process_frame          # (optional) let autoloads settle
@@ -223,21 +246,31 @@ func _propose_transition(dir: Vector2i) -> void:
 	candidate_defs = _edge_constrained_candidates(base_candidates, nx, ny)
 
 	# Prepare UI text
+	# Prepare UI thumbnails (image-first; text in tooltip)
 	for i in range(option_buttons.size()):
+		var btn := option_buttons[i]
+
 		if i < candidate_defs.size():
 			var def: Dictionary = candidate_defs[i]
-			var nice: String = ""
-			if def.has("name"):
-				nice = String(def["name"])
-			else:
-				var pth: String = String(def.get("path", ""))
-				nice = pth.get_file().get_basename().capitalize().replace("_", " ")
-			nice += "   " + _exit_arrows_inline(def, entry_side)
-			option_buttons[i].text = nice
-			option_buttons[i].visible = true
-		else:
-			option_buttons[i].visible = false
+			var path: String = String(def.get("path", ""))
 
+			# 1) Assign preview texture to the button's icon
+			btn.icon = _preview_for_room(path)
+
+			# 2) Optional tooltip showing name + exits
+			var display_name := String(def["name"]) if def.has("name") else path.get_file().get_basename().capitalize().replace("_", " ")
+			btn.tooltip_text = "%s\n%s" % [display_name, _def_exit_tooltip(def)]
+
+			# 3) Ensure visible & focusable
+			btn.visible = true
+			btn.disabled = false
+			btn.text = ""               # ensure no leftover text
+		else:
+			# Hide unused buttons
+			btn.visible = false
+			btn.disabled = true
+			btn.icon = null
+			btn.tooltip_text = ""
 	# If nothing to show, treat like wall
 	if candidate_defs.size() == 0:
 		_refresh_edge_blockers_for_current_room()
@@ -519,6 +552,10 @@ func _load_room_at(coord: Vector2i, path: String) -> void:
 # Input / UI
 # -------------------------------
 func _open_choice_panel() -> void:
+	if is_instance_valid(draft_overlay):
+		draft_overlay.visible = true
+		draft_overlay.modulate = Color(0, 0, 0, 0.8)  # 50% black
+
 	choice_panel.visible = true
 	if "set_input_enabled" in player:
 		player.set_input_enabled(false)
@@ -529,12 +566,17 @@ func _open_choice_panel() -> void:
 			_menu_index = i
 			break
 	option_buttons[_menu_index].grab_focus()
-
+	
+	
 func _close_choice_panel() -> void:
+	if is_instance_valid(draft_overlay):
+		draft_overlay.visible = false
+
 	choice_panel.visible = false
 	if "set_input_enabled" in player:
 		player.set_input_enabled(true)
-
+		
+		
 func _unhandled_input(event: InputEvent) -> void:
 	# ignore menus while game-over FX are running
 	if _game_over_running:
@@ -1345,3 +1387,25 @@ func _play_cutscene_for(key: String) -> void:
 
 	await overlay.play_images(frames, 1.0, 0.2, 0.0, 0.2, false, true, 0.35)
 	await overlay.finished
+
+
+
+func _preview_for_room(room_path: String) -> Texture2D:
+	# Convention: previews live in /rooms/previews with same basename .png
+	var base := room_path.get_file().get_basename() # e.g. "room_forest"
+	var dir := room_path.get_base_dir()
+	var candidate_paths := [
+		dir + "/previews/" + base + ".png",
+		dir + "/previews/" + base + "@2x.png",
+		dir + "/" + base + "_preview.png",
+		dir + "/" + base + ".png"
+	]
+
+	for p in candidate_paths:
+		if FileAccess.file_exists(p):
+			var tex := load(p)
+			if tex is Texture2D:
+				return tex
+
+	# Fallback: generic placeholder
+	return preload("res://ui/placeholder_tile.png")
