@@ -860,7 +860,7 @@ func _ready() -> void:
 	new_run()
 
 func new_run() -> void:
-	#disable_all_tutorial_rooms()
+	disable_all_tutorial_rooms()
 	seed = int(Time.get_unix_time_from_system())
 	rng.seed = seed
 	steps_left = START_STEPS
