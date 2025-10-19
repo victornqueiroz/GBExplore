@@ -62,6 +62,8 @@ const GAME_OVER_FADE_IN: float = 0.9
 @onready var map_overlay: Control = $MapOverlay/MapRoot
 @onready var dialog_box: Control = $UI/DialogueBox
 @onready var draft_overlay: ColorRect = $UI/DraftOverlay
+@onready var row: HBoxContainer = $UI/ChoicePanel/MarginContainer/HBoxContainer
+var big_preview: TextureRect   # created at runtime
 
 # ----- State -----
 var pending_dir := Vector2i.ZERO
@@ -88,28 +90,21 @@ func _show_edge_walls() -> bool:
 
 func _ready() -> void:
 	print("SM: _ready begin")
-	
-	# Make option buttons behave like image tiles
-	const DRAFT_THUMB := Vector2(40, 40)  # try 80x80 or 96x96
+	_ensure_big_preview()
 
-	# Row container (the HBox you just made)
-	var row := $UI/ChoicePanel/MarginContainer/HBoxContainer
+	const DRAFT_THUMB := Vector2(32, 32)
 	row.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 
 	for b in option_buttons:
-		# fixed small tile
 		b.custom_minimum_size = DRAFT_THUMB
-
-		# don't stretch; keep centered
 		b.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 		b.size_flags_vertical   = Control.SIZE_SHRINK_CENTER
-
-		# image setup
 		b.text = ""
-		b.expand_icon = true                # let icon scale to button rect
+		b.expand_icon = true
 		b.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		b.add_theme_constant_override("icon_max_width", int(DRAFT_THUMB.x))
 		b.add_theme_constant_override("icon_separation", 4)
+		
 	is_transitioning = true                 # <- block edge checks during boot
 
 	await get_tree().process_frame          # (optional) let autoloads settle
@@ -565,9 +560,20 @@ func _open_choice_panel() -> void:
 		if option_buttons[i].visible:
 			_menu_index = i
 			break
+	
 	option_buttons[_menu_index].grab_focus()
+	_update_draft_preview()
 	
-	
+func _update_draft_preview() -> void:
+	if big_preview == null:
+		return
+	if _menu_index < 0 or _menu_index >= candidate_defs.size():
+		big_preview.texture = null
+		return
+	var def: Dictionary = candidate_defs[_menu_index]
+	var path: String = String(def.get("path", ""))
+	big_preview.texture = _preview_for_room(path)
+		
 func _close_choice_panel() -> void:
 	if is_instance_valid(draft_overlay):
 		draft_overlay.visible = false
@@ -593,6 +599,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				i -= 1
 			option_buttons[_menu_index].grab_focus()
 			get_viewport().set_input_as_handled()
+			_update_draft_preview()
 			return
 
 		elif event.is_action_pressed("ui_down") or event.is_action_pressed("ui_right"):
@@ -1409,3 +1416,20 @@ func _preview_for_room(room_path: String) -> Texture2D:
 
 	# Fallback: generic placeholder
 	return preload("res://ui/placeholder_tile.png")
+
+func _ensure_big_preview() -> void:
+	var parent := $UI/ChoicePanel/MarginContainer
+	big_preview = parent.get_node_or_null("BigPreview") as TextureRect
+	if big_preview == null:
+		big_preview = TextureRect.new()
+		big_preview.name = "BigPreview"
+		parent.add_child(big_preview)
+		parent.move_child(big_preview, 0)  # put it ABOVE the HBox
+
+	# visuals / sizing
+	big_preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	big_preview.custom_minimum_size = Vector2(32, 32)  # tweak (80–112 work well)
+	big_preview.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	big_preview.size_flags_vertical   = Control.SIZE_SHRINK_CENTER
+	big_preview.scale = Vector2(1, 1)
+	big_preview.scale = Vector2(0.3, 0.3)  # 80% of true size

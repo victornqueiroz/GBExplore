@@ -51,6 +51,8 @@ offset_right = 20.0
 offset_bottom = 20.0
 grow_horizontal = 2
 grow_vertical = 2
+size_flags_horizontal = 4
+size_flags_vertical = 4
 mouse_filter = 2
 
 [node name="MarginContainer" type="MarginContainer" parent="UI/ChoicePanel"]
